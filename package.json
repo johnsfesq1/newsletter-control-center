@@ -1,12 +1,27 @@
 {
   "name": "newsletter-control-center",
   "version": "0.1.0",
-  "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
-  }
+    "@google-cloud/secret-manager": "^5.6.0",
+    "express": "^4.19.2",
+    "googleapis": "^131.0.0",
+    "readline": "^1.3.0"
+  },
+  "description": "A briefing service based on my newsletters",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnsfesq1/newsletter-control-center.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/johnsfesq1/newsletter-control-center/issues"
+  },
+  "homepage": "https://github.com/johnsfesq1/newsletter-control-center#readme"
 }
