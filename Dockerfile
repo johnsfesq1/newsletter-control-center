@@ -1,8 +1,23 @@
-FROM node:20-alpine
+# Use Node.js 20 slim image as base
+FROM node:20-slim
+
+# Set working directory
 WORKDIR /app
+
+# Copy package files for dependency installation
 COPY package*.json ./
-RUN npm ci --omit=dev
+COPY tsconfig.json ./
+
+# Install dependencies (including dev dependencies for tsx)
+RUN npm ci
+
+# Copy source code
+COPY scripts/ ./scripts/
+COPY newsletter-search/src/lib/ ./newsletter-search/src/lib/
 COPY . .
-ENV PORT=8080
-EXPOSE 8080
-CMD ["npm","start"]
+
+# Set entrypoint to run the processing script with tsx
+ENTRYPOINT ["npx", "tsx", "scripts/process-newsletters.ts"]
+
+# Default command (empty - entrypoint handles it)
+CMD []

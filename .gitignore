@@ -1,0 +1,5 @@
+.env
+.env.local
+processing-progress.json
+*.log
+overnight-run*.log

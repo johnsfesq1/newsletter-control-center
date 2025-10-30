@@ -1,0 +1,135 @@
+{
+  "senders": [
+    "bill@sinocism.com",
+    "thebismarckcables@substack.com",
+    "diplomatic@substack.com",
+    "phillipspobrien@substack.com",
+    "observingjapan+japan-daily-briefing@substack.com",
+    "flagship@semafor.com",
+    "gzerodaily@gzeromedia.com",
+    "asiasentinel+politics@substack.com",
+    "team@punchbowl.news",
+    "newswire@devex.com",
+    "newsletter@mail.worldpoliticsreview.com",
+    "markets@axios.com",
+    "newsletter@flyby.news",
+    "subscriptions@message.bloomberg.com",
+    "noreply@news.bloomberg.com",
+    "jashap@substack.com",
+    "globaldispatches@substack.com",
+    "newsletters@thediplomat.com",
+    "leadingthoughts@substack.com",
+    "topsecretumbra@substack.com",
+    "chinatalk@substack.com",
+    "africa@semafor.com",
+    "email@stratechery.com"
+  ],
+  "domains": [
+    "sinocism.com",
+    "substack.com",
+    "semafor.com",
+    "gzeromedia.com",
+    "punchbowl.news",
+    "devex.com",
+    "worldpoliticsreview.com",
+    "axios.com",
+    "flyby.news",
+    "bloomberg.com",
+    "thediplomat.com",
+    "stratechery.com"
+  ],
+  "publishers": [
+    {
+      "email": "bill@sinocism.com",
+      "name": "Sinocism (Bill Bishop)"
+    },
+    {
+      "email": "thebismarckcables@substack.com",
+      "name": "The Bismarck Cables"
+    },
+    {
+      "email": "diplomatic@substack.com",
+      "name": "Diplomatic (Laura)"
+    },
+    {
+      "email": "phillipspobrien@substack.com",
+      "name": "Phillips's Newsletter (Phillips P. OBrien)"
+    },
+    {
+      "email": "observingjapan+japan-daily-briefing@substack.com",
+      "name": "Observing Japan (Tobias Harris)"
+    },
+    {
+      "email": "flagship@semafor.com",
+      "name": "Semafor Flagship"
+    },
+    {
+      "email": "gzerodaily@gzeromedia.com",
+      "name": "GZERO Daily"
+    },
+    {
+      "email": "asiasentinel+politics@substack.com",
+      "name": "Asia Sentinel"
+    },
+    {
+      "email": "team@punchbowl.news",
+      "name": "Punchbowl News"
+    },
+    {
+      "email": "newswire@devex.com",
+      "name": "Devex Newswire"
+    },
+    {
+      "email": "newsletter@mail.worldpoliticsreview.com",
+      "name": "World Politics Review"
+    },
+    {
+      "email": "markets@axios.com",
+      "name": "Axios Markets"
+    },
+    {
+      "email": "newsletter@flyby.news",
+      "name": "Flyby (Defense News)"
+    },
+    {
+      "email": "subscriptions@message.bloomberg.com",
+      "name": "Bloomberg Markets"
+    },
+    {
+      "email": "noreply@news.bloomberg.com",
+      "name": "Money Stuff (Matt Levine)"
+    },
+    {
+      "email": "jashap@substack.com",
+      "name": "Jacob L. Shapiro"
+    },
+    {
+      "email": "globaldispatches@substack.com",
+      "name": "Global Dispatches"
+    },
+    {
+      "email": "newsletters@thediplomat.com",
+      "name": "The Diplomat (diplomatic news, weekly)"
+    },
+    {
+      "email": "leadingthoughts@substack.com",
+      "name": "Leading Thoughts (Christopher Smart, macro analyst)"
+    },
+    {
+      "email": "topsecretumbra@substack.com",
+      "name": "Top Secret Umbra (military/spy/security news roundup)"
+    },
+    {
+      "email": "chinatalk@substack.com",
+      "name": "ChinaTalk (China news)"
+    },
+    {
+      "email": "africa@semafor.com",
+      "name": "Semafor Africa"
+    },
+    {
+      "email": "email@stratechery.com",
+      "name": "Stratechery (Ben Thompson)"
+    }
+  ]
+}
