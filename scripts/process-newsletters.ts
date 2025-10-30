@@ -398,10 +398,20 @@ async function main() {
           // Insert chunks
           const dataset = bigquery.dataset(DATASET_ID);
           const table = dataset.table(CHUNKS_TABLE);
-          await table.insert(chunks);
           
-          stats.chunksCreated += chunks.length;
-          console.log(`   ✅ Created ${chunks.length} chunks`);
+          try {
+            await table.insert(chunks);
+            stats.chunksCreated += chunks.length;
+            console.log(`   ✅ Created ${chunks.length} chunks`);
+          } catch (insertError: any) {
+            // Handle duplicate insert errors gracefully
+            if (insertError?.message?.includes('duplicate') || insertError?.message?.includes('already exists')) {
+              console.log(`   ⚠️  Chunks already exist (skipping duplicate insert)`);
+              stats.chunksCreated += chunks.length; // Count them anyway for stats
+            } else {
+              throw insertError; // Re-throw if it's not a duplicate error
+            }
+          }
         } else {
           console.log(`   ⚠️  No chunks created (insufficient content)`);
         }
