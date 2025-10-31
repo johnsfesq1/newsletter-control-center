@@ -248,7 +248,7 @@ ${context}
 
 Return ONLY valid JSON, no additional text:`;
 
-  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.0-flash-exp:generateContent`;
+  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
   
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -324,7 +324,7 @@ CRITICAL RULES:
 
 Provide your answer:`;
 
-  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.0-flash-exp:generateContent`;
+  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
   
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -428,9 +428,9 @@ async function runRAGQuery(userQuery: string): Promise<{
  * Calculate cost (rough estimate)
  */
 function calculateCost(tokensIn: number, tokensOut: number): number {
-  // Gemini 2.0 Flash pricing (approximate)
-  const INPUT_COST_PER_1M = 0.075;  // $0.075 per 1M tokens
-  const OUTPUT_COST_PER_1M = 0.30;  // $0.30 per 1M tokens
+  // Gemini 2.5 Pro pricing (approximate)
+  const INPUT_COST_PER_1M = 1.25;  // $1.25 per 1M tokens
+  const OUTPUT_COST_PER_1M = 5.00;  // $5.00 per 1M tokens
   
   return (tokensIn / 1_000_000) * INPUT_COST_PER_1M + (tokensOut / 1_000_000) * OUTPUT_COST_PER_1M;
 }
@@ -556,7 +556,5 @@ async function runEvaluation() {
   console.log('═══════════════════════════════════════════════════════════\n');
 }
 
-if (require.main === module) {
-  runEvaluation().catch(console.error);
-}
+runEvaluation().catch(console.error);
 
