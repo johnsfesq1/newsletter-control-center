@@ -251,8 +251,8 @@ async function extractFacts(chunks: any[], userQuery: string): Promise<any[]> {
   const client = await auth.getClient();
   const accessToken = await client.getAccessToken();
 
-  const context = chunks.map((chunk, idx) => `
-Chunk ${idx + 1}:
+  const context = chunks.map((chunk) => `
+Chunk ${chunk.chunk_id}:
 Publisher: ${chunk.publisher_name}
 Date: ${chunk.sent_date ? new Date(chunk.sent_date.value || chunk.sent_date).toLocaleDateString() : 'Unknown'}
 Subject: ${chunk.subject}
