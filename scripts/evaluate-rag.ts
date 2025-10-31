@@ -251,6 +251,14 @@ ${context}
 
 Return ONLY valid JSON, no additional text:`;
 
+  // DEBUG: Log query and chunk count
+  console.log(`🔍 Query: "${userQuery}"`);
+  console.log(`🔍 Chunks to analyze: ${chunks.length}`);
+  if (chunks.length > 0) {
+    console.log(`🔍 First chunk publisher: ${chunks[0].publisher_name}`);
+    console.log(`🔍 First chunk text length: ${chunks[0].chunk_text?.length || 0} chars`);
+  }
+
   const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
   
   const response = await fetch(endpoint, {
@@ -282,9 +290,15 @@ Return ONLY valid JSON, no additional text:`;
   const data = await response.json();
   const text = data.candidates[0].content.parts[0].text;
   
+  // DEBUG: Log first 500 chars of response
+  console.log(`🔍 Gemini raw response (first 500 chars): ${text.substring(0, 500)}`);
+  
   try {
     const facts = JSON.parse(text);
     console.log(`✅ Extracted ${facts.length} facts`);
+    if (facts.length > 0) {
+      console.log(`🔍 First fact: ${JSON.stringify(facts[0])}`);
+    }
     return Array.isArray(facts) ? facts : [];
   } catch (error) {
     console.warn('⚠️  Failed to parse JSON, attempting fixes...');
