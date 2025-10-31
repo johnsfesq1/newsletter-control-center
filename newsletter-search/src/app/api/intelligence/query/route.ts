@@ -6,6 +6,38 @@ const DATASET_ID = 'ncc_newsletters';
 const CHUNKS_TABLE = 'chunks';
 const LOCATION = 'us-central1';
 
+// Budget configuration
+const DAILY_BUDGET_USD = 10.00; // Max spend per day
+const INPUT_COST_PER_1M = 1.25;
+const OUTPUT_COST_PER_1M = 5.00;
+
+// Simple in-memory daily spend tracking (will reset on server restart)
+// In production, this should be stored in BigQuery or Redis
+let dailySpend = 0;
+let dailySpendResetDate = new Date().toDateString();
+
+/**
+ * Check and update daily spend
+ */
+function checkDailyBudget(cost: number): boolean {
+  const today = new Date().toDateString();
+  
+  // Reset daily spend if it's a new day
+  if (today !== dailySpendResetDate) {
+    dailySpend = 0;
+    dailySpendResetDate = today;
+  }
+  
+  // Check if adding this cost would exceed budget
+  if (dailySpend + cost > DAILY_BUDGET_USD) {
+    return false;
+  }
+  
+  // Update daily spend
+  dailySpend += cost;
+  return true;
+}
+
 /**
  * Generate embedding for a query using Vertex AI
  */
@@ -235,7 +267,7 @@ async function getFullChunks(bigquery: BigQuery, chunkIds: string[]): Promise<an
 /**
  * Call Gemini 2.5 Pro to extract facts from chunks
  */
-async function extractFacts(chunks: any[], userQuery: string): Promise<any[]> {
+async function extractFacts(chunks: any[], userQuery: string): Promise<{facts: any[], tokens_in: number, tokens_out: number}> {
   const { GoogleAuth } = require('google-auth-library');
   const auth = new GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
@@ -296,13 +328,26 @@ Return ONLY valid JSON, no additional text:`;
   const data = await response.json();
   const text = data.candidates[0].content.parts[0].text;
   
+  // Get token usage
+  const usageMetadata = data.usageMetadata || {};
+  const tokensIn = usageMetadata.promptTokenCount || 0;
+  const tokensOut = usageMetadata.candidatesTokenCount || 0;
+  
   // Try to parse as JSON, fallback to empty array
   try {
     const facts = JSON.parse(text);
-    return Array.isArray(facts) ? facts : [];
+    return {
+      facts: Array.isArray(facts) ? facts : [],
+      tokens_in: tokensIn,
+      tokens_out: tokensOut
+    };
   } catch (error) {
     console.warn('Failed to parse facts as JSON:', text);
-    return [];
+    return {
+      facts: [],
+      tokens_in: tokensIn,
+      tokens_out: tokensOut
+    };
   }
 }
 
@@ -322,9 +367,13 @@ function formatCitation(chunk: any): string {
 /**
  * Call Gemini 2.5 Pro to synthesize answer from facts
  */
-async function synthesizeAnswer(facts: any[], userQuery: string, chunks: any[]): Promise<string> {
+async function synthesizeAnswer(facts: any[], userQuery: string, chunks: any[]): Promise<{answer: string, tokens_in: number, tokens_out: number}> {
   if (facts.length === 0) {
-    return 'No information found in the newsletter archive that answers this query.';
+    return {
+      answer: 'No information found in the newsletter archive that answers this query.',
+      tokens_in: 0,
+      tokens_out: 0
+    };
   }
 
   const { GoogleAuth } = require('google-auth-library');
@@ -385,7 +434,18 @@ Provide your answer:`;
   }
 
   const data = await response.json();
-  return data.candidates[0].content.parts[0].text.trim();
+  const answer = data.candidates[0].content.parts[0].text.trim();
+  
+  // Get token usage
+  const usageMetadata = data.usageMetadata || {};
+  const tokensIn = usageMetadata.promptTokenCount || 0;
+  const tokensOut = usageMetadata.candidatesTokenCount || 0;
+  
+  return {
+    answer,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -402,6 +462,9 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Processing query: "${query}"`);
 
     const bigquery = new BigQuery({ projectId: PROJECT_ID });
+    
+    // Note: We can't check budget before processing since we don't know the cost yet
+    // Will check after calculating actual cost
 
     // Step 1: Generate query embedding
     console.log('📊 Generating query embedding...');
@@ -420,17 +483,17 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Extract facts from chunks
     console.log('📝 Extracting facts from chunks...');
-    const facts = await extractFacts(fullChunks, query);
-    console.log(`✅ Extracted ${facts.length} facts`);
+    const extractResult = await extractFacts(fullChunks, query);
+    console.log(`✅ Extracted ${extractResult.facts.length} facts`);
 
     // Step 4: Synthesize answer from facts
     console.log('🤖 Synthesizing answer...');
-    const answer = await synthesizeAnswer(facts, query, fullChunks);
+    const synthResult = await synthesizeAnswer(extractResult.facts, query, fullChunks);
     console.log(`✅ Generated answer`);
     
     // Format citations for response
     const citations = Array.from(new Set(
-      facts.map(f => {
+      extractResult.facts.map(f => {
         const chunk = fullChunks.find(c => c.chunk_id === f.chunk_id);
         return chunk ? {
           chunk_id: f.chunk_id,
@@ -442,11 +505,26 @@ export async function POST(request: NextRequest) {
       }).filter(Boolean)
     )).slice(0, 5); // Max 5 citations
 
+    // Calculate total costs
+    const totalTokensIn = extractResult.tokens_in + synthResult.tokens_in;
+    const totalTokensOut = extractResult.tokens_out + synthResult.tokens_out;
+    const totalCost = (totalTokensIn / 1_000_000) * INPUT_COST_PER_1M + (totalTokensOut / 1_000_000) * OUTPUT_COST_PER_1M;
+
+    // Check daily budget (after processing, so we've already incurred the cost)
+    // But log it for monitoring
+    const withinBudget = checkDailyBudget(totalCost);
+    if (!withinBudget) {
+      console.warn(`⚠️  Daily budget exceeded: ${dailySpend.toFixed(4)} / ${DAILY_BUDGET_USD}`);
+    }
+
     return NextResponse.json({
       query,
-      answer,
+      answer: synthResult.answer,
       citations,
       chunks_used: chunks.length,
+      cost_usd: totalCost,
+      tokens_in: totalTokensIn,
+      tokens_out: totalTokensOut,
       chunks: chunks.map(c => ({
         chunk_id: c.chunk_id,
         subject: c.subject,
