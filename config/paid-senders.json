@@ -1,0 +1,6 @@
+{
+  "description": "List of email addresses that are paid newsletter subscriptions",
+  "note": "Add new paid senders here. They will be automatically detected during ingestion.",
+  "senders": []
+}
+

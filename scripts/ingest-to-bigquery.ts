@@ -2,9 +2,10 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { BigQuery } from '@google-cloud/bigquery';
-import { getGmail, extractEmailAddress } from '../src/lib/gmail';
+import { getGmail, extractEmailAddress, markAsIngested } from '../src/lib/gmail';
 import { extractPlaintext, getHeader } from '../src/lib/parseMessage';
 import vipConfig from '../config/vip.json';
+import paidConfig from '../config/paid-senders.json';
 import type { gmail_v1 } from 'googleapis';
 
 dotenv.config();
@@ -51,6 +52,7 @@ interface NewsletterMessage {
   body_text: string;
   body_html: string | null;
   is_vip: boolean;
+  is_paid: boolean | null;
   publisher_name: string;
   source_type: string;
   word_count: number;
@@ -69,6 +71,18 @@ function isVipEmail(fromEmail: string): boolean {
   // Check if domain matches any VIP domain
   const domain = fromEmail.split('@')[1]?.toLowerCase();
   if (domain && vipConfig.domains.includes(domain)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if an email address is a paid newsletter based on config
+ */
+function isPaidNewsletter(fromEmail: string): boolean {
+  // Check if email exactly matches any paid sender
+  if (paidConfig.senders.includes(fromEmail)) {
     return true;
   }
   
@@ -219,6 +233,7 @@ async function processMessage(
       body_text: bodyText,
       body_html: bodyHtml,
       is_vip: isVipEmail(fromEmail),
+      is_paid: isPaidNewsletter(fromEmail),
       publisher_name: extractPublisherName(fromHeader, fromEmail),
       source_type: 'newsletter',
       word_count: countWords(bodyText),
@@ -241,10 +256,13 @@ async function processMessage(
 
 /**
  * Insert messages to BigQuery in chunks to avoid 413 errors
+ * Optionally applies Gmail labels for successfully inserted messages
  */
 async function insertMessagesInChunks(
   messages: NewsletterMessage[],
-  stats: ProcessingStats
+  stats: ProcessingStats,
+  gmail?: gmail_v1.Gmail,
+  inboxType?: 'legacy' | 'clean'
 ): Promise<void> {
   if (messages.length === 0) return;
   
@@ -277,6 +295,14 @@ async function insertMessagesInChunks(
       } else {
         stats.totalInserted += chunk.length;
         console.log(`✅ Chunk ${chunkNumber} inserted successfully (${chunk.length} messages)`);
+        
+        // Apply Gmail labels for successfully inserted messages (only for clean inbox)
+        if (gmail && inboxType === 'clean') {
+          console.log(`🏷️  Applying labels to ${chunk.length} messages...`);
+          for (const msg of chunk) {
+            await markAsIngested(gmail, msg.id);
+          }
+        }
       }
       
     } catch (error) {
@@ -319,8 +345,9 @@ function writeFailedMessages(failedMessages: FailedMessage[]): void {
     console.log(`📊 Batch size: ${BATCH_SIZE} messages`);
     console.log(`⏰ Started at: ${stats.startTime.toISOString()}\n`);
     
-    // Get Gmail client
-    const gmail = getGmail();
+    // Get Gmail client (default to legacy inbox)
+    const GMAIL_INBOX = (process.env.GMAIL_INBOX as 'legacy' | 'clean') || 'legacy';
+    const gmail = getGmail(GMAIL_INBOX);
     
     // Get total message count estimate
     const initialListRes = await gmail.users.messages.list({
@@ -406,7 +433,7 @@ function writeFailedMessages(failedMessages: FailedMessage[]): void {
       
       // Insert batch to BigQuery in chunks
       if (messages.length > 0) {
-        await insertMessagesInChunks(messages, stats);
+        await insertMessagesInChunks(messages, stats, gmail, GMAIL_INBOX);
       }
       
       // Update pagination

@@ -243,11 +243,14 @@ async function extractFacts(chunks: any[], userQuery: string): Promise<any[]> {
   const client = await auth.getClient();
   const accessToken = await client.getAccessToken();
 
-  // Build context from chunks
+  // Build context from chunks with metadata for better citations
   const context = chunks.map((chunk, idx) => `
-Chunk ${idx + 1} (ID: ${chunk.chunk_id}):
-${chunk.chunk_text}
-`).join('\n');
+Chunk ${idx + 1}:
+Publisher: ${chunk.publisher_name}
+Date: ${chunk.sent_date ? new Date(chunk.sent_date.value || chunk.sent_date).toLocaleDateString() : 'Unknown'}
+Subject: ${chunk.subject}
+Content: ${chunk.chunk_text}
+`).join('\n---\n');
 
   const prompt = `Extract all facts, quotes, and data points from the following chunks that are relevant to the query: "${userQuery}"
 
@@ -279,7 +282,7 @@ Return ONLY valid JSON, no additional text:`;
         temperature: 0.1,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
         responseMimeType: 'application/json'
       }
     })
@@ -304,9 +307,22 @@ Return ONLY valid JSON, no additional text:`;
 }
 
 /**
+ * Format citation as "Publisher · Date · Subject"
+ */
+function formatCitation(chunk: any): string {
+  const publisher = chunk.publisher_name || 'Unknown Publisher';
+  const date = chunk.sent_date 
+    ? new Date(chunk.sent_date.value || chunk.sent_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Date unknown';
+  const subject = chunk.subject || 'No subject';
+  
+  return `${publisher} · ${date} · ${subject}`;
+}
+
+/**
  * Call Gemini 2.5 Pro to synthesize answer from facts
  */
-async function synthesizeAnswer(facts: any[], userQuery: string): Promise<string> {
+async function synthesizeAnswer(facts: any[], userQuery: string, chunks: any[]): Promise<string> {
   if (facts.length === 0) {
     return 'No information found in the newsletter archive that answers this query.';
   }
@@ -318,10 +334,12 @@ async function synthesizeAnswer(facts: any[], userQuery: string): Promise<string
   const client = await auth.getClient();
   const accessToken = await client.getAccessToken();
 
-  // Build facts list with citations
-  const factsList = facts.map(f => 
-    `- [${f.chunk_id}] ${f.fact}`
-  ).join('\n');
+  // Build facts list with citations (format: "Publisher · Date · Subject")
+  const factsList = facts.map(f => {
+    const chunk = chunks.find(c => c.chunk_id === f.chunk_id);
+    const citation = chunk ? formatCitation(chunk) : `[${f.chunk_id}]`;
+    return `- ${citation}: ${f.fact}`;
+  }).join('\n');
 
   const prompt = `You are an intelligence analyst answering questions based on newsletter content.
 
@@ -332,7 +350,7 @@ ${factsList}
 
 CRITICAL RULES:
 1. Answer the query using ONLY the provided facts
-2. Include inline citations: [chunk_id] after each statement
+2. Include inline citations: (Publisher · Date · Subject) after each statement
 3. If information isn't in the facts, don't make it up
 4. Write naturally and concisely
 5. If facts are contradictory, mention both perspectives
@@ -356,7 +374,7 @@ Provide your answer:`;
         temperature: 0.3,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024
+        maxOutputTokens: 4096
       }
     })
   });
@@ -407,13 +425,27 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Synthesize answer from facts
     console.log('🤖 Synthesizing answer...');
-    const answer = await synthesizeAnswer(facts, query);
+    const answer = await synthesizeAnswer(facts, query, fullChunks);
     console.log(`✅ Generated answer`);
+    
+    // Format citations for response
+    const citations = Array.from(new Set(
+      facts.map(f => {
+        const chunk = fullChunks.find(c => c.chunk_id === f.chunk_id);
+        return chunk ? {
+          chunk_id: f.chunk_id,
+          citation: formatCitation(chunk),
+          publisher: chunk.publisher_name,
+          date: chunk.sent_date,
+          subject: chunk.subject
+        } : null;
+      }).filter(Boolean)
+    )).slice(0, 5); // Max 5 citations
 
     return NextResponse.json({
       query,
       answer,
-      facts,
+      citations,
       chunks_used: chunks.length,
       chunks: chunks.map(c => ({
         chunk_id: c.chunk_id,

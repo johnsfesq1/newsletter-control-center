@@ -3,3 +3,19 @@
 processing-progress.json
 *.log
 overnight-run*.log
+CLOUD_SHELL_SECRET_COMMANDS.sh
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

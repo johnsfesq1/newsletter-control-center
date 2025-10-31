@@ -29,6 +29,7 @@ interface NewsletterChunk {
   sent_date: any;
   publisher_name: string;
   subject: string;
+  is_paid: boolean | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -241,6 +242,7 @@ async function processNewsletterWithEmbeddings(newsletter: any): Promise<Newslet
       sent_date: newsletter.sent_date,
       publisher_name: newsletter.publisher_name,
       subject: newsletter.subject,
+      is_paid: newsletter.is_paid || null,
       version: 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
