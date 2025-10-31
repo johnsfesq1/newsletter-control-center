@@ -284,10 +284,32 @@ Return ONLY valid JSON, no additional text:`;
   
   try {
     const facts = JSON.parse(text);
+    console.log(`✅ Extracted ${facts.length} facts`);
     return Array.isArray(facts) ? facts : [];
   } catch (error) {
-    console.warn('Failed to parse facts as JSON:', text);
-    return [];
+    console.warn('⚠️  Failed to parse JSON, attempting fixes...');
+    
+    // Try to fix common JSON issues
+    try {
+      // Sometimes Gemini wraps in ```json blocks or adds markdown
+      let cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Sometimes response is truncated - try to fix if we can find where it was cut
+      if (!cleaned.endsWith(']') && cleaned.includes('\n  },')) {
+        // Try to add closing brackets if response was truncated
+        const lastCompleteFact = cleaned.lastIndexOf('}');
+        if (lastCompleteFact > 0) {
+          cleaned = cleaned.substring(0, lastCompleteFact + 1) + '\n]';
+        }
+      }
+      
+      const facts = JSON.parse(cleaned);
+      console.log(`✅ Extracted ${facts.length} facts after cleanup`);
+      return Array.isArray(facts) ? facts : [];
+    } catch (retryError) {
+      console.warn('❌ Could not parse facts');
+      return [];
+    }
   }
 }
 
