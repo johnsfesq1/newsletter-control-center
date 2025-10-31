@@ -1,0 +1,77 @@
+{
+  "description": "Gold standard test questions for RAG evaluation",
+  "version": "1.0",
+  "questions": [
+    {
+      "id": "gq_01",
+      "question": "What are newsletters saying about climate change?",
+      "expected_topics": ["climate", "environment", "carbon", "emissions"],
+      "min_citations": 2,
+      "difficulty": "medium"
+    },
+    {
+      "id": "gq_02", 
+      "question": "What did Peter Zeihan say about China recently?",
+      "expected_topics": ["china", "zeihan"],
+      "min_citations": 1,
+      "difficulty": "easy"
+    },
+    {
+      "id": "gq_03",
+      "question": "What's happening in Ukraine at the moment?",
+      "expected_topics": ["ukraine", "russia", "war"],
+      "min_citations": 2,
+      "difficulty": "medium"
+    },
+    {
+      "id": "gq_04",
+      "question": "What did Bloomberg say about the state of the US stock market?",
+      "expected_topics": ["bloomberg", "stock market", "markets"],
+      "min_citations": 1,
+      "difficulty": "easy"
+    },
+    {
+      "id": "gq_05",
+      "question": "What are the recent trends in semiconductor manufacturing?",
+      "expected_topics": ["semiconductor", "chips", "manufacturing"],
+      "min_citations": 2,
+      "difficulty": "medium"
+    },
+    {
+      "id": "gq_06",
+      "question": "What do analysts think about artificial intelligence regulation?",
+      "expected_topics": ["artificial intelligence", "AI", "regulation", "policy"],
+      "min_citations": 2,
+      "difficulty": "medium"
+    },
+    {
+      "id": "gq_07",
+      "question": "What are newsletters reporting about energy prices?",
+      "expected_topics": ["energy", "oil", "gas", "prices"],
+      "min_citations": 2,
+      "difficulty": "easy"
+    },
+    {
+      "id": "gq_08",
+      "question": "What's the latest on the Middle East conflict?",
+      "expected_topics": ["middle east", "israel", "palestine", "gaza"],
+      "min_citations": 2,
+      "difficulty": "easy"
+    },
+    {
+      "id": "gq_09",
+      "question": "What did Semafor report about US-China relations?",
+      "expected_topics": ["semafor", "US-China", "diplomacy"],
+      "min_citations": 1,
+      "difficulty": "easy"
+    },
+    {
+      "id": "gq_10",
+      "question": "What are the emerging trends in electric vehicles?",
+      "expected_topics": ["electric vehicles", "EV", "tesla", "automotive"],
+      "min_citations": 2,
+      "difficulty": "medium"
+    }
+  ]
+}
+
