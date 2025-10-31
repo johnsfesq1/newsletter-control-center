@@ -17,9 +17,8 @@ COPY newsletter-search/src/lib/ ./newsletter-search/src/lib/
 COPY config/ ./config/
 COPY . .
 
-# Set entrypoint to run the evaluation script with tsx
-ENTRYPOINT ["npx", "tsx", "scripts/evaluate-rag.ts"]
+# Set entrypoint to run the processing script with tsx
+ENTRYPOINT ["npx", "tsx", "scripts/process-newsletters.ts"]
 
 # Default command (empty - entrypoint handles it)
 CMD []
-
