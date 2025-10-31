@@ -257,6 +257,11 @@ Return ONLY valid JSON, no additional text:`;
   if (chunks.length > 0) {
     console.log(`🔍 First chunk publisher: ${chunks[0].publisher_name}`);
     console.log(`🔍 First chunk text length: ${chunks[0].chunk_text?.length || 0} chars`);
+    console.log(`🔍 First chunk text preview: ${chunks[0].chunk_text?.substring(0, 300)}`);
+  }
+  if (chunks.length > 1) {
+    console.log(`🔍 Second chunk publisher: ${chunks[1].publisher_name}`);
+    console.log(`🔍 Second chunk text preview: ${chunks[1].chunk_text?.substring(0, 300)}`);
   }
 
   const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
@@ -397,7 +402,7 @@ Provide your answer:`;
 /**
  * Run RAG query
  */
-async function runRAGQuery(userQuery: string): Promise<{
+export async function runRAGQuery(userQuery: string): Promise<{
   answer: string;
   facts: any[];
   citations: any[];
