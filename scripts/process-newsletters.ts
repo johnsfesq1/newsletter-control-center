@@ -362,17 +362,17 @@ async function main() {
       stats.startTime = new Date().toISOString();
     }
 
-    // Fetch newsletters
+    // Fetch newsletters without ORDER BY to avoid memory exhaustion
+    // Process in batches, skipping already processed ones
     console.log('📥 Fetching newsletters from BigQuery...');
     const query = `
       SELECT *
       FROM \`${PROJECT_ID}.${DATASET_ID}.${MESSAGES_TABLE}\`
       WHERE (LENGTH(body_text) > 500 OR LENGTH(body_html) > 1000)
-      ORDER BY sent_date DESC
-      LIMIT ${limit}
-      OFFSET ${startFrom}
+      LIMIT ${limit * 2}
     `;
 
+    console.log(`   Query: Fetching up to ${limit * 2} newsletters (will skip already processed)...`);
     const [rows] = await bigquery.query(query);
     if (!savedProgress) {
       stats.total = rows.length;
