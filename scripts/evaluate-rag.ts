@@ -272,18 +272,6 @@ ${context}
 
 Return ONLY valid JSON, no additional text:`;
 
-  // DEBUG: Log query and chunk count
-  console.log(`🔍 Query: "${userQuery}"`);
-  console.log(`🔍 Chunks to analyze: ${chunks.length}`);
-  if (chunks.length > 0) {
-    console.log(`🔍 First chunk publisher: ${chunks[0].publisher_name}`);
-    console.log(`🔍 First chunk text length: ${chunks[0].chunk_text?.length || 0} chars`);
-    console.log(`🔍 First chunk text preview: ${chunks[0].chunk_text?.substring(0, 300)}`);
-  }
-  if (chunks.length > 1) {
-    console.log(`🔍 Second chunk publisher: ${chunks[1].publisher_name}`);
-    console.log(`🔍 Second chunk text preview: ${chunks[1].chunk_text?.substring(0, 300)}`);
-  }
 
   const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
   
@@ -316,19 +304,10 @@ Return ONLY valid JSON, no additional text:`;
   const data = await response.json();
   const text = data.candidates[0].content.parts[0].text;
   
-  // DEBUG: Log first 500 chars of response
-  console.log(`🔍 Gemini raw response (first 500 chars): ${text.substring(0, 500)}`);
-  
   try {
     const facts = JSON.parse(text);
-    console.log(`✅ Extracted ${facts.length} facts`);
-    if (facts.length > 0) {
-      console.log(`🔍 First fact: ${JSON.stringify(facts[0])}`);
-    }
     return Array.isArray(facts) ? facts : [];
   } catch (error) {
-    console.warn('⚠️  Failed to parse JSON, attempting fixes...');
-    
     // Try to fix common JSON issues
     try {
       // Sometimes Gemini wraps in ```json blocks or adds markdown
@@ -344,10 +323,9 @@ Return ONLY valid JSON, no additional text:`;
       }
       
       const facts = JSON.parse(cleaned);
-      console.log(`✅ Extracted ${facts.length} facts after cleanup`);
       return Array.isArray(facts) ? facts : [];
     } catch (retryError) {
-      console.warn('❌ Could not parse facts');
+      console.warn('❌ Could not parse facts:', retryError);
       return [];
     }
   }
