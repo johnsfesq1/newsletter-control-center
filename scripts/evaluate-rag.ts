@@ -185,7 +185,10 @@ async function hybridSearch(bigquery: BigQuery, userQuery: string, queryEmbeddin
  * Fetch full chunk text from BigQuery
  */
 async function getFullChunks(bigquery: BigQuery, chunkIds: string[]): Promise<any[]> {
-  const ids = chunkIds.map(id => `'${id}'`).join(',');
+  if (chunkIds.length === 0) return [];
+  
+  // Escape single quotes and wrap in quotes
+  const ids = chunkIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
   
   const query = `
     SELECT 
