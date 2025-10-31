@@ -75,9 +75,33 @@ async function generateEmbedding(text: string): Promise<number[]> {
  * Vector search using cosine similarity
  */
 async function vectorSearch(bigquery: BigQuery, queryEmbedding: number[], topK: number = 10): Promise<any[]> {
-  const embeddingStr = JSON.stringify(queryEmbedding);
+  const embeddingStr = `[${queryEmbedding.join(',')}]`;
   
   const query = `
+    WITH query_embedding AS (
+      SELECT ${embeddingStr} AS embedding
+    ),
+    chunk_distances AS (
+      SELECT
+        c.chunk_id,
+        c.newsletter_id,
+        c.chunk_index,
+        c.chunk_text,
+        c.subject,
+        c.publisher_name,
+        c.sent_date,
+        c.is_paid,
+        1 - (
+          SELECT SUM(a * b) / (SQRT(SUM(a * a)) * SQRT(SUM(b * b)))
+          FROM 
+            UNNEST(query_embedding.embedding) AS a WITH OFFSET i
+            JOIN 
+            UNNEST(c.chunk_embedding) AS b WITH OFFSET j
+          WHERE i = j
+        ) AS distance
+      FROM \`${PROJECT_ID}.${DATASET_ID}.${CHUNKS_TABLE}\` c, query_embedding
+      WHERE c.chunk_embedding IS NOT NULL
+    )
     SELECT 
       chunk_id,
       newsletter_id,
@@ -87,11 +111,8 @@ async function vectorSearch(bigquery: BigQuery, queryEmbedding: number[], topK: 
       publisher_name,
       sent_date,
       is_paid,
-      1 - (
-        COSINE_DISTANCE(chunk_embedding, [${queryEmbedding.join(', ')}])
-      ) AS distance
-    FROM \`${PROJECT_ID}.${DATASET_ID}.${CHUNKS_TABLE}\`
-    WHERE chunk_embedding IS NOT NULL
+      distance
+    FROM chunk_distances
     ORDER BY distance ASC
     LIMIT ${topK}
   `;
