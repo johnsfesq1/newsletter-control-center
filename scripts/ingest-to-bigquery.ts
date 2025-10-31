@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getGmail, extractEmailAddress, markAsIngested } from '../src/lib/gmail';
 import { extractPlaintext, getHeader } from '../src/lib/parseMessage';
@@ -57,6 +58,20 @@ interface NewsletterMessage {
   source_type: string;
   word_count: number;
   has_attachments: boolean;
+  doc_id: string | null;
+  doc_version: number | null;
+  from_domain: string | null;
+  list_id: string | null;
+  was_forwarded: boolean | null;
+  source_inbox: string | null;
+}
+
+/**
+ * Generate stable doc_id from message metadata
+ */
+function generateDocId(sender: string, subject: string, sentDate: string | null): string {
+  const data = `${sender}|${subject}|${sentDate || ''}`;
+  return createHash('sha256').update(data).digest('hex').substring(0, 32);
 }
 
 /**
@@ -215,20 +230,31 @@ async function processMessage(
     const fromHeader = getHeader(fullMsg.data, 'From');
     const subject = getHeader(fullMsg.data, 'Subject') || '(no subject)';
     const dateHeader = getHeader(fullMsg.data, 'Date');
+    const listIdHeader = getHeader(fullMsg.data, 'List-Id');
     
     // Extract email address
     const fromEmail = extractEmailAddress(fromHeader);
+    const fromDomain = fromEmail.split('@')[1] || null;
     
     // Extract content
     const bodyText = extractPlaintext(fullMsg.data);
     const bodyHtml = extractHtmlContent(fullMsg.data);
+    
+    // Check if forwarded
+    const wasForwarded = getHeader(fullMsg.data, 'X-Forwarded-For') !== '' || 
+                         getHeader(fullMsg.data, 'X-Original-To') !== '' ||
+                         fromHeader.toLowerCase().includes('forwarded message');
+    
+    // Generate doc_id
+    const sentDate = convertDateHeader(dateHeader);
+    const docId = generateDocId(fromEmail, subject, sentDate);
     
     // Build message object
     const message: NewsletterMessage = {
       id: msgId,
       sender: fromEmail,
       subject: subject,
-      sent_date: convertDateHeader(dateHeader),
+      sent_date: sentDate,
       received_date: convertInternalDate(fullMsg.data.internalDate || ''),
       body_text: bodyText,
       body_html: bodyHtml,
@@ -237,7 +263,13 @@ async function processMessage(
       publisher_name: extractPublisherName(fromHeader, fromEmail),
       source_type: 'newsletter',
       word_count: countWords(bodyText),
-      has_attachments: hasAttachments(fullMsg.data)
+      has_attachments: hasAttachments(fullMsg.data),
+      doc_id: docId,
+      doc_version: 1,
+      from_domain: fromDomain,
+      list_id: listIdHeader || null,
+      was_forwarded: wasForwarded,
+      source_inbox: null  // Will be set by caller if needed
     };
     
     return message;
@@ -427,6 +459,7 @@ function writeFailedMessages(failedMessages: FailedMessage[]): void {
         
         const message = await processMessage(gmail, msgId, stats, failedMessages);
         if (message) {
+          message.source_inbox = GMAIL_INBOX;
           messages.push(message);
         }
       }
