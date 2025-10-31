@@ -362,64 +362,93 @@ async function main() {
       stats.startTime = new Date().toISOString();
     }
 
-    // Fetch newsletters without ORDER BY to avoid memory exhaustion
-    // Process in batches, skipping already processed ones
-    console.log('📥 Fetching newsletters from BigQuery...');
-    const query = `
-      SELECT *
-      FROM \`${PROJECT_ID}.${DATASET_ID}.${MESSAGES_TABLE}\`
-      WHERE (LENGTH(body_text) > 500 OR LENGTH(body_html) > 1000)
-      LIMIT ${limit * 2}
-    `;
-
-    console.log(`   Query: Fetching up to ${limit * 2} newsletters (will skip already processed)...`);
-    const [rows] = await bigquery.query(query);
+    // Process in small batches to avoid memory issues
+    // We'll fetch 1000 at a time, process them, then fetch next 1000
+    const BATCH_SIZE = 1000;
+    let totalToProcess = limit;
+    let offset = 0;
+    let batchNumber = 0;
+    
     if (!savedProgress) {
-      stats.total = rows.length;
+      stats.total = limit;
     }
 
-    console.log(`✅ Fetched ${rows.length} newsletters\n`);
+    console.log(`📥 Processing ${limit} newsletters in batches of ${BATCH_SIZE}...\n`);
 
-    // Process each newsletter
-    for (const newsletter of rows) {
-      // Skip if already processed
-      if (existingIds.has(newsletter.id)) {
-        stats.skipped++;
-        console.log(`⏭️  Skipping already processed: ${newsletter.subject}`);
-        continue;
+    // Main processing loop: fetch batch, process, repeat
+    while (totalToProcess > 0) {
+      batchNumber++;
+      const batchLimit = Math.min(BATCH_SIZE, totalToProcess);
+      
+      console.log(`\n═══════════════════════════════════════════════════════════════`);
+      console.log(`📦 BATCH ${batchNumber}: Fetching ${batchLimit} newsletters...`);
+      console.log(`═══════════════════════════════════════════════════════════════\n`);
+      
+      const query = `
+        SELECT *
+        FROM \`${PROJECT_ID}.${DATASET_ID}.${MESSAGES_TABLE}\`
+        WHERE (LENGTH(body_text) > 500 OR LENGTH(body_html) > 1000)
+        LIMIT ${batchLimit}
+        OFFSET ${offset}
+      `;
+
+      const [rows] = await bigquery.query(query);
+      console.log(`✅ Fetched ${rows.length} newsletters from BigQuery\n`);
+
+      if (rows.length === 0) {
+        console.log('✅ No more newsletters to fetch - we\'re done!\n');
+        break;
       }
 
-      logProgress(newsletter);
-
-      try {
-        const chunks = await processNewsletterWithEmbeddings(newsletter);
-
-        if (chunks.length > 0) {
-          // Insert chunks
-          const dataset = bigquery.dataset(DATASET_ID);
-          const table = dataset.table(CHUNKS_TABLE);
-          
-          try {
-            await table.insert(chunks);
-            stats.chunksCreated += chunks.length;
-            console.log(`   ✅ Created ${chunks.length} chunks`);
-          } catch (insertError: any) {
-            // Handle duplicate insert errors gracefully
-            if (insertError?.message?.includes('duplicate') || insertError?.message?.includes('already exists')) {
-              console.log(`   ⚠️  Chunks already exist (skipping duplicate insert)`);
-              stats.chunksCreated += chunks.length; // Count them anyway for stats
-            } else {
-              throw insertError; // Re-throw if it's not a duplicate error
-            }
-          }
-        } else {
-          console.log(`   ⚠️  No chunks created (insufficient content)`);
+      // Process each newsletter in this batch
+      for (const newsletter of rows) {
+        // Skip if already processed
+        if (existingIds.has(newsletter.id)) {
+          stats.skipped++;
+          console.log(`⏭️  Skipping already processed: ${newsletter.subject}`);
+          continue;
         }
-      } catch (error) {
-        stats.failed++;
-        console.error(`   ❌ Failed: ${error instanceof Error ? error.message : error}`);
-        // Continue processing - don't let one failure stop the pipeline
+
+        logProgress(newsletter);
+
+        try {
+          const chunks = await processNewsletterWithEmbeddings(newsletter);
+
+          if (chunks.length > 0) {
+            // Insert chunks
+            const dataset = bigquery.dataset(DATASET_ID);
+            const table = dataset.table(CHUNKS_TABLE);
+            
+            try {
+              await table.insert(chunks);
+              stats.chunksCreated += chunks.length;
+              console.log(`   ✅ Created ${chunks.length} chunks`);
+            } catch (insertError: any) {
+              // Handle duplicate insert errors gracefully
+              if (insertError?.message?.includes('duplicate') || insertError?.message?.includes('already exists')) {
+                console.log(`   ⚠️  Chunks already exist (skipping duplicate insert)`);
+                stats.chunksCreated += chunks.length; // Count them anyway for stats
+              } else {
+                throw insertError; // Re-throw if it's not a duplicate error
+              }
+            }
+          } else {
+            console.log(`   ⚠️  No chunks created (insufficient content)`);
+          }
+        } catch (error) {
+          stats.failed++;
+          console.error(`   ❌ Failed: ${error instanceof Error ? error.message : error}`);
+          // Continue processing - don't let one failure stop the pipeline
+        }
       }
+
+      // Update for next batch
+      offset += rows.length;
+      totalToProcess -= rows.length;
+      
+      console.log(`\n✅ Batch ${batchNumber} complete. Processed ${rows.length} newsletters.`);
+      console.log(`📊 Progress: ${stats.processed} processed, ${stats.skipped} skipped, ${stats.failed} failed`);
+      console.log(`📦 Remaining: ${totalToProcess} newsletters\n`);
     }
 
     // Final summary
