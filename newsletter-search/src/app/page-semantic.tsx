@@ -8,8 +8,6 @@ interface SemanticResult {
   answer: string;
   citations: Array<{
     chunk_id: string;
-    newsletter_id: string;
-    chunk_index?: number;
     citation: string;
     publisher: string;
     date: any;
@@ -19,21 +17,13 @@ interface SemanticResult {
   cost_usd: number;
   chunks: Array<{
     chunk_id: string;
-    newsletter_id: string;
     subject: string;
     publisher: string;
     score: number;
   }>;
-  publisher_rankings?: Array<{
-    publisher: string;
-    relevance_score: number;
-    chunk_count: number;
-    avg_score: number;
-    latest_date?: any;
-  }>;
 }
 
-export default function Home() {
+export default function SemanticSearchPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SemanticResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,7 +93,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Semantic Newsletter Search</h1>
           <p className="text-gray-600">Ask questions and get intelligent answers from 69,673 newsletters</p>
@@ -117,13 +107,13 @@ export default function Home() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Ask a question... (e.g., 'What are the latest developments in AI regulation?')"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-lg"
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {loading ? 'Searching...' : 'Search'}
             </button>
@@ -140,12 +130,12 @@ export default function Home() {
         {/* Loading State */}
         {loading && (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-              <div className="h-4 bg-gray-200 rounded w-5/6 mx-auto"></div>
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
             </div>
-            <p className="mt-6 text-gray-500">Searching 938,601 chunks with semantic embeddings...</p>
+            <p className="mt-4 text-gray-500">Searching 938,601 chunks...</p>
           </div>
         )}
 
@@ -153,12 +143,12 @@ export default function Home() {
         {results && !loading && (
           <div className="space-y-6">
             {/* AI Answer */}
-            <div className="bg-white rounded-lg shadow-md p-8">
+            <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Answer</h2>
-              <div className="prose max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
+              <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">
                 {results.answer}
               </div>
-              <div className="mt-6 pt-4 border-t border-gray-200 text-sm text-gray-500">
+              <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-500">
                 Based on {results.chunks_used} relevant chunks • Cost: ${results.cost_usd.toFixed(4)}
               </div>
             </div>
@@ -166,45 +156,13 @@ export default function Home() {
             {/* Citations */}
             {results.citations && results.citations.length > 0 && (
               <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Sources ({results.citations.length})</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Sources</h3>
                 <div className="space-y-3">
                   {results.citations.map((citation, idx) => (
-                    <Link
-                      key={idx}
-                      href={`/newsletter/${citation.newsletter_id}${citation.chunk_index !== undefined ? `?highlight_chunk=${citation.chunk_index}` : ''}`}
-                      className="block border-l-4 border-blue-500 pl-4 py-2 hover:bg-blue-50 transition-colors rounded-r hover:shadow-sm"
-                    >
-                      <div className="font-medium text-gray-900 hover:text-blue-700">{citation.citation}</div>
+                    <div key={idx} className="border-l-4 border-blue-500 pl-4 py-2">
+                      <div className="font-medium text-gray-900">{citation.citation}</div>
                       <div className="text-sm text-gray-500 mt-1">
                         {formatDate(citation.date)}
-                      </div>
-                      <div className="text-xs text-blue-600 mt-1 opacity-75">
-                        Click to read full newsletter →
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Publisher Rankings */}
-            {results.publisher_rankings && results.publisher_rankings.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Top Publishers</h3>
-                <div className="space-y-3">
-                  {results.publisher_rankings.slice(0, 5).map((pub, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{pub.publisher}</div>
-                        <div className="text-sm text-gray-500">
-                          {pub.chunk_count} relevant {pub.chunk_count === 1 ? 'chunk' : 'chunks'}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-blue-600">
-                          {(pub.relevance_score * 100).toFixed(0)}%
-                        </div>
-                        <div className="text-xs text-gray-400">relevance</div>
                       </div>
                     </div>
                   ))}
@@ -219,20 +177,15 @@ export default function Home() {
                   Relevant Newsletters ({results.chunks.length})
                 </h3>
                 <div className="space-y-3">
-                  {results.chunks.slice(0, 10).map((chunk, idx) => (
-                    <div key={chunk.chunk_id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  {results.chunks.slice(0, 5).map((chunk, idx) => (
+                    <div key={chunk.chunk_id} className="border border-gray-200 rounded p-3 hover:bg-gray-50">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="font-medium text-gray-900 mb-1">{chunk.subject}</div>
+                          <div className="font-medium text-gray-900">{chunk.subject}</div>
                           <div className="text-sm text-gray-500">{chunk.publisher}</div>
                         </div>
-                        <div className="text-right ml-4">
-                          <Link
-                            href={`/newsletter/${chunk.newsletter_id}`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline block"
-                          >
-                            {(chunk.score).toFixed(0)}% match →
-                          </Link>
+                        <div className="text-sm text-gray-400 ml-4">
+                          {(chunk.score * 100).toFixed(0)}% match
                         </div>
                       </div>
                     </div>
@@ -245,18 +198,8 @@ export default function Home() {
 
         {/* No Results State */}
         {!loading && !results && !error && query && (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-gray-500 text-lg">No results found. Try a different query.</p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !results && !error && !query && (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-gray-500 text-lg">Enter a question above to search through 938,601 chunks from 69,673 newsletters.</p>
-            <div className="mt-4 text-sm text-gray-400">
-              Example: "What are the latest developments in AI regulation?"
-            </div>
+          <div className="bg-white p-6 rounded-lg shadow-md text-center">
+            <p className="text-gray-500">Enter a question above to search.</p>
           </div>
         )}
       </div>

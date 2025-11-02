@@ -234,11 +234,52 @@ async function hybridSearch(
   });
 
   // Sort by combined score and return top K
-  const sorted = Array.from(combined.values())
+  let sorted = Array.from(combined.values())
     .sort((a, b) => b.combined_score - a.combined_score)
-    .slice(0, topK);
+    .slice(0, topK * 2); // Get more candidates for reranking
 
-  return sorted;
+  // Apply freshness bias (boost recent newsletters)
+  const now = Date.now();
+  sorted = sorted.map(chunk => {
+    let freshnessBonus = 0;
+    if (chunk.sent_date) {
+      let chunkDate: number;
+      if (chunk.sent_date && typeof chunk.sent_date === 'object' && chunk.sent_date.value) {
+        chunkDate = new Date(chunk.sent_date.value).getTime();
+      } else if (typeof chunk.sent_date === 'string') {
+        chunkDate = new Date(chunk.sent_date).getTime();
+      } else {
+        chunkDate = 0;
+      }
+      
+      if (chunkDate > 0) {
+        // Boost by 10% for items from last 30 days, 5% for last 90 days
+        const daysAgo = (now - chunkDate) / (1000 * 60 * 60 * 24);
+        if (daysAgo <= 30) {
+          freshnessBonus = 0.1;
+        } else if (daysAgo <= 90) {
+          freshnessBonus = 0.05;
+        }
+      }
+    }
+    
+    return {
+      ...chunk,
+      combined_score: Math.min(chunk.combined_score + freshnessBonus, 1.0) // Cap at 1.0
+    };
+  });
+
+  // Rerank with freshness
+  sorted.sort((a, b) => b.combined_score - a.combined_score);
+
+  // Normalize scores relative to top result (top = 100%)
+  const topScore = sorted[0]?.combined_score || 1;
+  sorted = sorted.map(chunk => ({
+    ...chunk,
+    normalized_score: topScore > 0 ? chunk.combined_score / topScore : chunk.combined_score
+  }));
+
+  return sorted.slice(0, topK);
 }
 
 /**
@@ -362,6 +403,76 @@ function formatCitation(chunk: any): string {
   const subject = chunk.subject || 'No subject';
   
   return `${publisher} · ${date} · ${subject}`;
+}
+
+/**
+ * Calculate publisher relevance rankings based on chunk results
+ */
+function calculatePublisherRankings(chunks: any[]): Array<{
+  publisher: string;
+  relevance_score: number;
+  chunk_count: number;
+  avg_score: number;
+  latest_date: any;
+}> {
+  const publisherMap = new Map<string, {
+    chunks: any[];
+    scores: number[];
+    dates: any[];
+  }>();
+
+  chunks.forEach(chunk => {
+    const publisher = chunk.publisher_name || 'Unknown';
+    if (!publisherMap.has(publisher)) {
+      publisherMap.set(publisher, { chunks: [], scores: [], dates: [] });
+    }
+    const data = publisherMap.get(publisher)!;
+    data.chunks.push(chunk);
+    data.scores.push(chunk.combined_score || (1 - chunk.distance) || 0);
+    if (chunk.sent_date) {
+      data.dates.push(chunk.sent_date);
+    }
+  });
+
+  const rankings = Array.from(publisherMap.entries()).map(([publisher, data]) => {
+    const avgScore = data.scores.reduce((a, b) => a + b, 0) / data.scores.length;
+    const maxScore = Math.max(...data.scores);
+    const chunkCount = data.chunks.length;
+    
+    // Latest date (for freshness calculation)
+    let latestDate: any = null;
+    if (data.dates.length > 0) {
+      const dates = data.dates.map(d => {
+        if (d && typeof d === 'object' && d.value) {
+          return new Date(d.value).getTime();
+        } else if (typeof d === 'string') {
+          return new Date(d).getTime();
+        }
+        return 0;
+      }).filter(t => t > 0);
+      if (dates.length > 0) {
+        latestDate = data.dates[dates.indexOf(Math.max(...dates))];
+      }
+    }
+
+    // Relevance score combines:
+    // - Average similarity (40%)
+    // - Maximum similarity (30%) 
+    // - Number of relevant chunks (20%)
+    // - Freshness bonus (10%) - applied later if we have dates
+    const relevanceScore = (avgScore * 0.4) + (maxScore * 0.3) + (Math.min(chunkCount / 5, 1) * 0.2);
+
+    return {
+      publisher,
+      relevance_score: Math.min(relevanceScore, 1), // Normalize to 0-1
+      chunk_count: chunkCount,
+      avg_score: avgScore,
+      latest_date: latestDate
+    };
+  });
+
+  // Sort by relevance score descending
+  return rankings.sort((a, b) => b.relevance_score - a.relevance_score);
 }
 
 /**
@@ -491,19 +602,25 @@ export async function POST(request: NextRequest) {
     const synthResult = await synthesizeAnswer(extractResult.facts, query, fullChunks);
     console.log(`✅ Generated answer`);
     
-    // Format citations for response
+    // Format citations for response with newsletter_id for linking
     const citations = Array.from(new Set(
       extractResult.facts.map(f => {
         const chunk = fullChunks.find(c => c.chunk_id === f.chunk_id);
-        return chunk ? {
-          chunk_id: f.chunk_id,
-          citation: formatCitation(chunk),
-          publisher: chunk.publisher_name,
-          date: chunk.sent_date,
-          subject: chunk.subject
-        } : null;
+        return chunk ? f.chunk_id : null;
       }).filter(Boolean)
-    )).slice(0, 5); // Max 5 citations
+    )).map(chunkId => {
+      const chunk = fullChunks.find(c => c.chunk_id === chunkId);
+      if (!chunk) return null;
+      return {
+        chunk_id: chunk.chunk_id,
+        newsletter_id: chunk.newsletter_id, // Add for linking
+        chunk_index: chunk.chunk_index, // Add for highlighting specific chunk
+        citation: formatCitation(chunk),
+        publisher: chunk.publisher_name,
+        date: chunk.sent_date,
+        subject: chunk.subject
+      };
+    }).filter(Boolean).slice(0, 5); // Max 5 citations
 
     // Calculate total costs
     const totalTokensIn = extractResult.tokens_in + synthResult.tokens_in;
@@ -527,10 +644,13 @@ export async function POST(request: NextRequest) {
       tokens_out: totalTokensOut,
       chunks: chunks.map(c => ({
         chunk_id: c.chunk_id,
+        newsletter_id: c.newsletter_id, // Add for linking
         subject: c.subject,
         publisher: c.publisher_name,
-        score: c.combined_score || (1 - c.distance)
-      }))
+        score: (c.normalized_score || c.combined_score || (1 - c.distance)) * 100 // Convert to percentage
+      })),
+      // Add publisher rankings
+      publisher_rankings: calculatePublisherRankings(chunks)
     });
 
   } catch (error) {

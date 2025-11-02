@@ -45,6 +45,7 @@ interface ProcessingStats {
   startTime: string;
   lastUpdateTime: string;
   processedNewsletterIds: string[];
+  lastProcessedId?: string; // For cursor-based pagination
 }
 
 // Cost tracking
@@ -61,7 +62,8 @@ let stats: ProcessingStats = {
   apiCalls: 0,
   startTime: new Date().toISOString(),
   lastUpdateTime: new Date().toISOString(),
-  processedNewsletterIds: []
+  processedNewsletterIds: [],
+  lastProcessedId: undefined
 };
 
 function createSemanticChunks(text: string, targetSize: number = TARGET_CHUNK_SIZE): string[] {
@@ -365,17 +367,22 @@ async function main() {
     }
 
     // Process in small batches to avoid memory issues
-    // We'll fetch 1000 at a time, process them, then fetch next 1000
+    // Use cursor-based pagination (WHERE id > lastId) instead of OFFSET to avoid BigQuery memory errors
     const BATCH_SIZE = 1000;
     let totalToProcess = limit;
-    let offset = 0;
     let batchNumber = 0;
+    let lastProcessedId = savedProgress?.lastProcessedId;
     
     if (!savedProgress) {
       stats.total = limit;
     }
 
-    console.log(`📥 Processing ${limit} newsletters in batches of ${BATCH_SIZE}...\n`);
+    console.log(`📥 Processing ${limit} newsletters in batches of ${BATCH_SIZE}...`);
+    if (lastProcessedId) {
+      console.log(`📍 Resuming from newsletter ID: ${lastProcessedId}\n`);
+    } else {
+      console.log(`📍 Starting from the beginning\n`);
+    }
 
     // Main processing loop: fetch batch, process, repeat
     while (totalToProcess > 0) {
@@ -384,17 +391,69 @@ async function main() {
       
       console.log(`\n═══════════════════════════════════════════════════════════════`);
       console.log(`📦 BATCH ${batchNumber}: Fetching ${batchLimit} newsletters...`);
+      if (lastProcessedId) {
+        console.log(`   Starting from ID > ${lastProcessedId}`);
+      }
       console.log(`═══════════════════════════════════════════════════════════════\n`);
       
-      const query = `
-        SELECT *
-        FROM \`${PROJECT_ID}.${DATASET_ID}.${MESSAGES_TABLE}\`
-        WHERE (LENGTH(body_text) > 500 OR LENGTH(body_html) > 1000)
-        LIMIT ${batchLimit}
-        OFFSET ${offset}
-      `;
+      // Cursor-based pagination: much more efficient than OFFSET at scale
+      // Use parameterized query to safely handle the lastProcessedId
+      const queryOptions: any = {
+        query: `
+          SELECT *
+          FROM \`${PROJECT_ID}.${DATASET_ID}.${MESSAGES_TABLE}\`
+          WHERE (LENGTH(body_text) > 500 OR LENGTH(body_html) > 1000)
+            ${lastProcessedId ? 'AND id > @lastProcessedId' : ''}
+          ORDER BY id ASC
+          LIMIT @batchLimit
+        `,
+        params: {
+          batchLimit: batchLimit
+        }
+      };
+      
+      if (lastProcessedId) {
+        queryOptions.params.lastProcessedId = lastProcessedId;
+      }
 
-      const [rows] = await bigquery.query(query);
+      // Retry logic for BigQuery resource errors
+      let rows: any[] = [];
+      let queryAttempts = 0;
+      const maxQueryRetries = 3;
+      
+      while (queryAttempts < maxQueryRetries) {
+        try {
+          const [queryRows] = await bigquery.query(queryOptions);
+          rows = queryRows;
+          break; // Success, exit retry loop
+        } catch (queryError: any) {
+          queryAttempts++;
+          const errorMessage = queryError?.message || String(queryError);
+          
+          // Check if it's a resource/memory error
+          if (errorMessage.includes('Resources exceeded') || 
+              errorMessage.includes('resourcesExceeded') ||
+              errorMessage.includes('memory') ||
+              errorMessage.includes('Resources exceeded during query execution')) {
+            if (queryAttempts >= maxQueryRetries) {
+              console.error(`\n❌ BigQuery resource error after ${maxQueryRetries} attempts:`);
+              console.error(`   ${errorMessage}`);
+              console.error(`\n💾 Progress saved. The job can be restarted and it will resume from the last processed ID.`);
+              saveProgress();
+              throw new Error(`BigQuery resource error: ${errorMessage}`);
+            }
+            
+            // Exponential backoff with jitter
+            const waitTime = Math.pow(2, queryAttempts) * 1000 + Math.random() * 1000;
+            console.warn(`⚠️  BigQuery resource error (attempt ${queryAttempts}/${maxQueryRetries}). Retrying in ${Math.round(waitTime)}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            // Non-resource error, re-throw immediately
+            throw queryError;
+          }
+        }
+      }
+
       console.log(`✅ Fetched ${rows.length} newsletters from BigQuery\n`);
 
       if (rows.length === 0) {
@@ -408,6 +467,7 @@ async function main() {
         if (existingIds.has(newsletter.id)) {
           stats.skipped++;
           console.log(`⏭️  Skipping already processed: ${newsletter.subject}`);
+          lastProcessedId = newsletter.id; // Update cursor even for skipped items
           continue;
         }
 
@@ -437,20 +497,28 @@ async function main() {
           } else {
             console.log(`   ⚠️  No chunks created (insufficient content)`);
           }
+          
+          // Update cursor after successful processing
+          lastProcessedId = newsletter.id;
+          stats.lastProcessedId = lastProcessedId;
         } catch (error) {
           stats.failed++;
           console.error(`   ❌ Failed: ${error instanceof Error ? error.message : error}`);
           // Continue processing - don't let one failure stop the pipeline
+          // Still update cursor to avoid reprocessing failed items (they'll be skipped on retry)
+          lastProcessedId = newsletter.id;
+          stats.lastProcessedId = lastProcessedId;
         }
       }
 
-      // Update for next batch
-      offset += rows.length;
+      // Update progress and save after each batch
       totalToProcess -= rows.length;
+      saveProgress(); // Save progress after each batch to enable recovery
       
       console.log(`\n✅ Batch ${batchNumber} complete. Processed ${rows.length} newsletters.`);
       console.log(`📊 Progress: ${stats.processed} processed, ${stats.skipped} skipped, ${stats.failed} failed`);
-      console.log(`📦 Remaining: ${totalToProcess} newsletters\n`);
+      console.log(`📦 Remaining: ${totalToProcess} newsletters`);
+      console.log(`📍 Last processed ID: ${lastProcessedId}\n`);
     }
 
     // Final summary
@@ -479,9 +547,18 @@ async function main() {
 
   } catch (error) {
     console.error('\n❌ Pipeline failed:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`   Error details: ${errorMessage}`);
+    
+    // Save progress before exiting
     console.log(`\n💾 Progress saved. Resume by running the same command.`);
+    if (stats.lastProcessedId) {
+      console.log(`📍 Will resume from newsletter ID: ${stats.lastProcessedId}`);
+    }
     saveProgress();
-    throw error;
+    
+    // Exit with error code so Cloud Run knows the job failed
+    process.exit(1);
   }
 }
 
