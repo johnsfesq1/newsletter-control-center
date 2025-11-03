@@ -180,7 +180,31 @@ async function discoverNewsletters() {
       totalNotRelevant += stats.notRelevant;
       totalManualReview += stats.manualReview;
       allDiscoveries.push(...classified);
-      await storeDiscoveries(bigquery, classified);
+      
+      // Store discoveries - retry up to 3 times to handle transient BigQuery errors
+      let storageSuccess = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!storageSuccess && retryCount < maxRetries) {
+        try {
+          await storeDiscoveries(bigquery, classified);
+          storageSuccess = true;
+        } catch (storageError: any) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error(`   ❌ Storage failed after ${maxRetries} attempts:`, storageError.message);
+            console.error(`   ⚠️  ${classified.length} discoveries classified but NOT persisted to BigQuery`);
+            console.error(`   💡 These discoveries will be lost if the job restarts. Check BigQuery connection.`);
+            // Continue - discoveries are in memory but not persisted
+            // This prevents losing all work if BigQuery has persistent issues
+          } else {
+            const waitTime = retryCount * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.warn(`   ⚠️  Storage attempt ${retryCount} failed, retrying in ${waitTime/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
       
       if (totalDiscovered >= 100 && totalDiscovered % 100 < substackResults.length) {
         showProgress();
@@ -205,7 +229,31 @@ async function discoverNewsletters() {
       totalNotRelevant += stats.notRelevant;
       totalManualReview += stats.manualReview;
       allDiscoveries.push(...classified);
-      await storeDiscoveries(bigquery, classified);
+      
+      // Store discoveries - retry up to 3 times to handle transient BigQuery errors
+      let storageSuccess = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!storageSuccess && retryCount < maxRetries) {
+        try {
+          await storeDiscoveries(bigquery, classified);
+          storageSuccess = true;
+        } catch (storageError: any) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error(`   ❌ Storage failed after ${maxRetries} attempts:`, storageError.message);
+            console.error(`   ⚠️  ${classified.length} discoveries classified but NOT persisted to BigQuery`);
+            console.error(`   💡 These discoveries will be lost if the job restarts. Check BigQuery connection.`);
+            // Continue - discoveries are in memory but not persisted
+            // This prevents losing all work if BigQuery has persistent issues
+          } else {
+            const waitTime = retryCount * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.warn(`   ⚠️  Storage attempt ${retryCount} failed, retrying in ${waitTime/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
       
       if (totalDiscovered >= 100 && totalDiscovered % 100 < recommendationResults.length) {
         showProgress();
@@ -230,7 +278,31 @@ async function discoverNewsletters() {
       totalNotRelevant += stats.notRelevant;
       totalManualReview += stats.manualReview;
       allDiscoveries.push(...classified);
-      await storeDiscoveries(bigquery, classified);
+      
+      // Store discoveries - retry up to 3 times to handle transient BigQuery errors
+      let storageSuccess = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!storageSuccess && retryCount < maxRetries) {
+        try {
+          await storeDiscoveries(bigquery, classified);
+          storageSuccess = true;
+        } catch (storageError: any) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error(`   ❌ Storage failed after ${maxRetries} attempts:`, storageError.message);
+            console.error(`   ⚠️  ${classified.length} discoveries classified but NOT persisted to BigQuery`);
+            console.error(`   💡 These discoveries will be lost if the job restarts. Check BigQuery connection.`);
+            // Continue - discoveries are in memory but not persisted
+            // This prevents losing all work if BigQuery has persistent issues
+          } else {
+            const waitTime = retryCount * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.warn(`   ⚠️  Storage attempt ${retryCount} failed, retrying in ${waitTime/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
       
       if (totalDiscovered >= 100 && totalDiscovered % 100 < directoryResults.length) {
         showProgress();
@@ -255,7 +327,31 @@ async function discoverNewsletters() {
       totalNotRelevant += stats.notRelevant;
       totalManualReview += stats.manualReview;
       allDiscoveries.push(...classified);
-      await storeDiscoveries(bigquery, classified);
+      
+      // Store discoveries - retry up to 3 times to handle transient BigQuery errors
+      let storageSuccess = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!storageSuccess && retryCount < maxRetries) {
+        try {
+          await storeDiscoveries(bigquery, classified);
+          storageSuccess = true;
+        } catch (storageError: any) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error(`   ❌ Storage failed after ${maxRetries} attempts:`, storageError.message);
+            console.error(`   ⚠️  ${classified.length} discoveries classified but NOT persisted to BigQuery`);
+            console.error(`   💡 These discoveries will be lost if the job restarts. Check BigQuery connection.`);
+            // Continue - discoveries are in memory but not persisted
+            // This prevents losing all work if BigQuery has persistent issues
+          } else {
+            const waitTime = retryCount * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.warn(`   ⚠️  Storage attempt ${retryCount} failed, retrying in ${waitTime/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
       
       if (totalDiscovered >= 100 && totalDiscovered % 100 < beehiivResults.length) {
         showProgress();
@@ -282,7 +378,31 @@ async function discoverNewsletters() {
       totalNotRelevant += stats.notRelevant;
       totalManualReview += stats.manualReview;
       allDiscoveries.push(...classified);
-      await storeDiscoveries(bigquery, classified);
+      
+      // Store discoveries - retry up to 3 times to handle transient BigQuery errors
+      let storageSuccess = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!storageSuccess && retryCount < maxRetries) {
+        try {
+          await storeDiscoveries(bigquery, classified);
+          storageSuccess = true;
+        } catch (storageError: any) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error(`   ❌ Storage failed after ${maxRetries} attempts:`, storageError.message);
+            console.error(`   ⚠️  ${classified.length} discoveries classified but NOT persisted to BigQuery`);
+            console.error(`   💡 These discoveries will be lost if the job restarts. Check BigQuery connection.`);
+            // Continue - discoveries are in memory but not persisted
+            // This prevents losing all work if BigQuery has persistent issues
+          } else {
+            const waitTime = retryCount * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.warn(`   ⚠️  Storage attempt ${retryCount} failed, retrying in ${waitTime/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
       
       if (totalDiscovered >= 100 && totalDiscovered % 100 < webResults.length) {
         showProgress();
