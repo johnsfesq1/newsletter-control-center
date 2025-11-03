@@ -20,10 +20,25 @@ IMAGE_NAME="gcr.io/${PROJECT_ID}/${JOB_NAME}"
 echo "Step 1: Building Docker image (this takes ~5-7 minutes)..."
 echo "   Image: ${IMAGE_NAME}"
 echo ""
+# Temporarily rename Dockerfile.discovery to Dockerfile for build
+if [ -f "Dockerfile" ]; then
+  mv Dockerfile Dockerfile.backup
+  RESTORE_DOCKERFILE=true
+else
+  RESTORE_DOCKERFILE=false
+fi
+
+cp Dockerfile.discovery Dockerfile
+
 gcloud builds submit \
   --tag "${IMAGE_NAME}" \
-  --file Dockerfile.discovery \
   --project "${PROJECT_ID}"
+
+# Restore original Dockerfile
+rm Dockerfile
+if [ "$RESTORE_DOCKERFILE" = "true" ]; then
+  mv Dockerfile.backup Dockerfile
+fi
 
 echo ""
 echo "✅ Docker image built successfully"
@@ -41,22 +56,22 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJ
     --image "${IMAGE_NAME}:latest" \
     --region "${REGION}" \
     --project "${PROJECT_ID}" \
-    --memory 2Gi \
-    --cpu 2 \
-    --timeout 3600 \
-    --max-retries 0 \
-    --task-timeout 3600
+         --memory 2Gi \
+         --cpu 2 \
+         --max-retries 0 \
+         --task-timeout 10800 \
+         --update-env-vars GOOGLE_CUSTOM_SEARCH_API_KEY=AIzaSyBl8wqgAt2n1TveS7gUQwa36rdf_Pafd9U,GOOGLE_CUSTOM_SEARCH_ENGINE_ID=52171af16fb2a4128
 else
   echo "   Job doesn't exist - creating..."
   gcloud run jobs create "${JOB_NAME}" \
     --image "${IMAGE_NAME}:latest" \
     --region "${REGION}" \
     --project "${PROJECT_ID}" \
-    --memory 2Gi \
-    --cpu 2 \
-    --timeout 3600 \
-    --max-retries 0 \
-    --task-timeout 3600
+         --memory 2Gi \
+         --cpu 2 \
+         --max-retries 0 \
+         --task-timeout 10800 \
+         --update-env-vars GOOGLE_CUSTOM_SEARCH_API_KEY=AIzaSyBl8wqgAt2n1TveS7gUQwa36rdf_Pafd9U,GOOGLE_CUSTOM_SEARCH_ENGINE_ID=52171af16fb2a4128
 fi
 
 echo ""
