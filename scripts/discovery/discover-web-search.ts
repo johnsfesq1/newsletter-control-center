@@ -66,6 +66,39 @@ function extractNewsletterUrl(url: string, title?: string, snippet?: string): st
     const hostname = urlObj.hostname.toLowerCase();
     const path = urlObj.pathname.toLowerCase();
     
+    // Skip social media and non-newsletter platforms
+    const socialMediaDomains = [
+      'linkedin.com', 'linkedin.co',
+      'facebook.com', 'fb.com',
+      'twitter.com', 'x.com',
+      'instagram.com',
+      'youtube.com',
+      'tiktok.com',
+      'reddit.com',
+      'medium.com',
+      'pinterest.com'
+    ];
+    
+    for (const domain of socialMediaDomains) {
+      if (hostname.includes(domain)) {
+        return null; // Skip social media
+      }
+    }
+    
+    // Skip academic/research domains unless they have clear newsletter indicators
+    if (hostname.endsWith('.edu') || hostname.endsWith('.ac.uk') || hostname.endsWith('.ac.za')) {
+      // Only include if path has newsletter indicators
+      if (!path.includes('/newsletter') && !path.includes('/subscribe') && 
+          !(snippet && snippet.toLowerCase().includes('newsletter'))) {
+        return null;
+      }
+    }
+    
+    // Skip PDF files
+    if (path.endsWith('.pdf') || url.toLowerCase().endsWith('.pdf')) {
+      return null;
+    }
+    
     // Skip obvious non-newsletter pages
     if (path.includes('/tag/') || path.includes('/category/') || path.includes('/author/')) {
       return null;
