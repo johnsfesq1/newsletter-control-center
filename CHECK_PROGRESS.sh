@@ -1,46 +1,31 @@
 #!/bin/bash
 
-# Quick progress checker for newsletter processing
+# Simple progress check - just shows what's happening
 
-echo "📊 NEWSLETTER PROCESSING STATUS"
-echo "================================="
+echo "🔍 Checking discovery job progress..."
 echo ""
 
-# Check if process is running
-if pgrep -f "process-newsletters.ts" > /dev/null; then
-    echo "✅ Process is running"
-    echo ""
-    
-    # Show recent progress
-    if [ -f overnight-run-v3.log ]; then
-        echo "📝 Recent activity (last 15 lines):"
-        echo "-----------------------------------"
-        tail -15 overnight-run-v3.log
-    fi
-    
-    # Check for progress file
-    if [ -f processing-progress.json ]; then
-        echo ""
-        echo "💾 Progress saved (can resume if interrupted)"
-        echo ""
-        echo "📈 Summary from progress file:"
-        cat processing-progress.json | grep -E "processed|failed|skipped" | head -4
-    fi
-else
-    echo "❌ Process is not running"
-    echo ""
-    
-    # Show final output
-    if [ -f overnight-run-v3.log ]; then
-        echo "📝 Final output:"
-        echo "-----------------------------------"
-        tail -50 overnight-run-v3.log
-    fi
-fi
+# Show execution status
+echo "📊 Job Status:"
+gcloud run jobs executions list \
+  --job discover-newsletters \
+  --region us-central1 \
+  --project newsletter-control-center \
+  --limit 1 \
+  --format="table(EXECUTION,RUNNING,COMPLETE,CREATED)"
 
 echo ""
-echo "💡 Commands:"
-echo "   Watch live: tail -f overnight-run-v3.log"
-echo "   Check progress: cat processing-progress.json"
-echo "   Check process: ps aux | grep process-newsletters"
+echo "📝 Latest Activity (last 15 log lines):"
+echo "─────────────────────────────────────────"
 
+gcloud logging read \
+  "resource.type=cloud_run_job AND resource.labels.job_name=discover-newsletters" \
+  --limit 30 \
+  --format="value(textPayload)" \
+  --project newsletter-control-center 2>/dev/null | \
+  grep -E "(Searching|Found|Classifying|Complete|Progress|Stored|Step)" | \
+  tail -15
+
+echo ""
+echo "💡 View full logs in Console:"
+echo "   https://console.cloud.google.com/run/jobs/executions/details/us-central1/discover-newsletters-n6lv4?project=newsletter-control-center"

@@ -397,14 +397,18 @@ async function main() {
       console.log(`═══════════════════════════════════════════════════════════════\n`);
       
       // Cursor-based pagination: much more efficient than OFFSET at scale
+      // PRIORITIZE: Process clean inbox messages first, then legacy
       // Use parameterized query to safely handle the lastProcessedId
       const queryOptions: any = {
         query: `
           SELECT *
           FROM \`${PROJECT_ID}.${DATASET_ID}.${MESSAGES_TABLE}\`
           WHERE (LENGTH(body_text) > 500 OR LENGTH(body_html) > 1000)
+            AND id NOT IN (SELECT DISTINCT newsletter_id FROM \`${PROJECT_ID}.${DATASET_ID}.${CHUNKS_TABLE}\` WHERE newsletter_id IS NOT NULL)
             ${lastProcessedId ? 'AND id > @lastProcessedId' : ''}
-          ORDER BY id ASC
+          ORDER BY 
+            CASE WHEN source_inbox = 'clean' THEN 0 ELSE 1 END,
+            id ASC
           LIMIT @batchLimit
         `,
         params: {

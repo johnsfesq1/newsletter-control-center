@@ -56,22 +56,22 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJ
     --image "${IMAGE_NAME}:latest" \
     --region "${REGION}" \
     --project "${PROJECT_ID}" \
-         --memory 2Gi \
-         --cpu 2 \
-         --max-retries 0 \
-         --task-timeout 10800 \
-         --update-env-vars GOOGLE_CUSTOM_SEARCH_API_KEY=AIzaSyBl8wqgAt2n1TveS7gUQwa36rdf_Pafd9U,GOOGLE_CUSTOM_SEARCH_ENGINE_ID=52171af16fb2a4128
+    --memory 2Gi \
+    --cpu 2 \
+    --max-retries 0 \
+    --task-timeout 10800 \
+    --set-secrets=GOOGLE_CUSTOM_SEARCH_API_KEY=google-custom-search-api-key:latest,GOOGLE_CUSTOM_SEARCH_ENGINE_ID=google-custom-search-engine-id:latest
 else
   echo "   Job doesn't exist - creating..."
   gcloud run jobs create "${JOB_NAME}" \
     --image "${IMAGE_NAME}:latest" \
     --region "${REGION}" \
     --project "${PROJECT_ID}" \
-         --memory 2Gi \
-         --cpu 2 \
-         --max-retries 0 \
-         --task-timeout 10800 \
-         --update-env-vars GOOGLE_CUSTOM_SEARCH_API_KEY=AIzaSyBl8wqgAt2n1TveS7gUQwa36rdf_Pafd9U,GOOGLE_CUSTOM_SEARCH_ENGINE_ID=52171af16fb2a4128
+    --memory 2Gi \
+    --cpu 2 \
+    --max-retries 0 \
+    --task-timeout 10800 \
+    --set-secrets=GOOGLE_CUSTOM_SEARCH_API_KEY=google-custom-search-api-key:latest,GOOGLE_CUSTOM_SEARCH_ENGINE_ID=google-custom-search-engine-id:latest
 fi
 
 echo ""

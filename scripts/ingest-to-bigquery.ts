@@ -381,10 +381,13 @@ function writeFailedMessages(failedMessages: FailedMessage[]): void {
     const GMAIL_INBOX = (process.env.GMAIL_INBOX as 'legacy' | 'clean') || 'legacy';
     const gmail = getGmail(GMAIL_INBOX);
     
+    // Get custom query from env or default to inbox
+    const customQuery = process.env.GMAIL_INGESTION_QUERY || 'in:inbox';
+    
     // Get total message count estimate
     const initialListRes = await gmail.users.messages.list({
       userId: 'me',
-      q: 'in:inbox',
+      q: customQuery,
       maxResults: 1
     });
     
@@ -402,7 +405,7 @@ function writeFailedMessages(failedMessages: FailedMessage[]): void {
       // Fetch batch of messages
       const listRes = await gmail.users.messages.list({
         userId: 'me',
-        q: 'in:inbox',
+        q: customQuery,
         maxResults: BATCH_SIZE,
         pageToken: pageToken || undefined
       });

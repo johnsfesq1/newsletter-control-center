@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { BigQuery } from '@google-cloud/bigquery';
 
 const PROJECT_ID = process.env.BIGQUERY_PROJECT_ID || 'newsletter-control-center';
