@@ -1,13 +1,36 @@
 import type { gmail_v1 } from 'googleapis';
 
-// Base64 URL decoding used by Gmail message parts
-function decodeBase64Url(input: string): string {
-  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
-  const buff = Buffer.from(normalized, 'base64');
-  return buff.toString('utf-8');
+// Safe base64url decoder with fallback to base64
+function decodeBase64Url(s: string): string {
+  try {
+    // Gmail parts are base64url-encoded
+    const b = Buffer.from(s, 'base64url');
+    return b.toString('utf8');
+  } catch {
+    try {
+      return Buffer.from(s, 'base64').toString('utf8');
+    } catch {
+      return '';
+    }
+  }
 }
 
-// Try to find a text/plain part; if not, fall back to text/html and strip tags.
+// HTML to text converter with basic entity decoding and whitespace collapse
+export function htmlToText(html: string): string {
+  const dec = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return dec;
+}
+
+// Try to find body content; prefer HTML, fall back to text/plain, then snippet.
 export function extractPlaintext(msg: gmail_v1.Schema$Message): string {
   if (!msg || !msg.payload) return '';
 
@@ -29,32 +52,35 @@ export function extractPlaintext(msg: gmail_v1.Schema$Message): string {
     return decodeBase64Url(data);
   };
 
-  // Prefer text/plain
-  for (const p of parts) {
-    if ((p.mimeType || '').toLowerCase().startsWith('text/plain')) {
-      return getBody(p).trim();
-    }
-  }
-
-  // Fallback to text/html → naive strip
+  // Prefer HTML (more complete content)
   for (const p of parts) {
     if ((p.mimeType || '').toLowerCase().startsWith('text/html')) {
       const html = getBody(p);
-      const text = html
-        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/\s+\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/[ \t]{2,}/g, ' ');
-      return text.trim();
+      const text = htmlToText(html);
+      if (text.length < 10) {
+        console.warn(`parse: body too short for gmail_id=${msg.id}`);
+      }
+      return text;
+    }
+  }
+
+  // Fallback to text/plain
+  for (const p of parts) {
+    if ((p.mimeType || '').toLowerCase().startsWith('text/plain')) {
+      const text = getBody(p).trim();
+      if (text.length < 10) {
+        console.warn(`parse: body too short for gmail_id=${msg.id}`);
+      }
+      return text;
     }
   }
 
   // Last resort: Gmail snippet
-  return (msg.snippet || '').trim();
+  const snippet = (msg.snippet || '').trim();
+  if (snippet.length < 10 && snippet.length > 0) {
+    console.warn(`parse: body too short for gmail_id=${msg.id}`);
+  }
+  return snippet;
 }
 
 // Grab a header value by name (e.g., 'From', 'Subject', 'Date')

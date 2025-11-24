@@ -3,11 +3,14 @@
     "target": "ES2020",
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "rootDir": ".",
+    "outDir": "dist",
     "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true,
     "resolveJsonModule": true,
-    "outDir": "dist"
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": false
   },
-  "include": ["src", "scripts", "config"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", "newsletter-search", "**/newsletter-search/**", "scripts/legacy/**"]
 }

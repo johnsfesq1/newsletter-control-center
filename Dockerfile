@@ -1,53 +1,30 @@
-# Dockerfile for Newsletter Discovery Cloud Run Job
-# Use Node.js 20 slim image as base
-FROM node:20-slim
+# ---------- Builder ----------
+FROM node:20-slim AS builder
 
-# Install Puppeteer dependencies (needed for web scraping)
-RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-sandbox \
-    fonts-liberation \
-    libappindicator3-1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set Puppeteer to use system Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
-# Set working directory
 WORKDIR /app
 
-# Copy package files for dependency installation
+# Only package files first for better caching
 COPY package*.json ./
-COPY tsconfig.json ./
-
-# Install dependencies (including dev dependencies for tsx)
 RUN npm ci
 
-# Copy source code
-COPY scripts/ ./scripts/
-COPY config/ ./config/
+# Bring in the rest of the source
 COPY . .
 
-# Set entrypoint to run the discovery orchestrator with tsx
-ENTRYPOINT ["npx", "tsx", "scripts/discovery/discover-orchestrator.ts"]
+# Compile TypeScript
+RUN npm run build
 
-# Default command (empty - entrypoint handles it)
-CMD []
+# ---------- Runner ----------
+FROM node:20-slim AS runner
 
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Install only production deps
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy compiled JS only
+COPY --from=builder /app/dist ./dist
+
+# Default command is harmless (we override in Cloud Run Jobs)
+CMD ["node", "-e", "console.log('ncc-worker image ready')"]

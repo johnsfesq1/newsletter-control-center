@@ -1,0 +1,279 @@
+================================================================================
+ SCHEDULER FIX - DEPLOYMENT INSTRUCTIONS
+ Date: 2025-11-23
+================================================================================
+
+WHAT WAS WRONG:
+---------------
+❌ Ingestion schedulers were running but runner service rejected them (HTTP 400)
+❌ Runner whitelist missing: 'ncc-ingest-me', 'ncc-ingest-other'
+❌ Last successful ingestion: November 6 (17 days ago!)
+❌ Schedule was 3x daily (7:10 AM, 12:10 PM, 5:10 PM ET)
+
+WHAT WAS FIXED:
+---------------
+✅ Added ingestion jobs to runner whitelist (src/api/jobs-runner.ts)
+✅ Changed schedule to 2x daily (7:00 AM, 1:00 PM ET)
+✅ Created scheduler management commands (status, execute, delete-old)
+✅ Created comprehensive documentation (docs/SCHEDULER_MANAGEMENT.md)
+✅ Code compiled successfully (npm run build passed)
+
+================================================================================
+ STEP-BY-STEP DEPLOYMENT
+================================================================================
+
+STEP 1: Build and Deploy Runner Service
+----------------------------------------
+This updates the runner to accept ingestion jobs.
+
+Commands:
+  npm run cloud:build
+  npm run cloud:runner:apply
+
+Time: ~5 minutes
+Status: Waiting for you to run
+
+
+STEP 2: Delete Old 3x Daily Schedulers
+---------------------------------------
+This removes the old failing scheduler jobs.
+
+Command:
+  npm run cloud:schedule:delete-old
+
+What it deletes:
+  - schedule-ncc-ingest-me-0710
+  - schedule-ncc-ingest-me-1210
+  - schedule-ncc-ingest-me-1710
+  - schedule-ncc-ingest-other-0710
+  - schedule-ncc-ingest-other-1210
+  - schedule-ncc-ingest-other-1710
+
+Time: ~1 minute
+Status: Waiting for you to run
+
+
+STEP 3: Create New 2x Daily Schedulers
+---------------------------------------
+This creates the new working scheduler jobs.
+
+Command:
+  npm run cloud:schedule:apply
+
+What it creates:
+  - schedule-ncc-ingest-me-0700 (7:00 AM ET)
+  - schedule-ncc-ingest-me-1300 (1:00 PM ET)
+  - schedule-ncc-ingest-other-0700 (7:00 AM ET)
+  - schedule-ncc-ingest-other-1300 (1:00 PM ET)
+
+Time: ~2 minutes
+Status: Waiting for you to run
+
+
+STEP 4: Verify Deployment
+--------------------------
+Check that everything is configured correctly.
+
+Command:
+  npm run cloud:schedule:status
+
+Expected output:
+  - 4 ingestion jobs showing ✅ ENABLED
+  - 3 processing jobs showing ✅ ENABLED  
+  - Next run times showing future times (not "N/A")
+  - No ❌ errors in last run column
+
+Status: Waiting for you to run
+
+
+STEP 5: Test Manually (Don't Wait for Schedule)
+------------------------------------------------
+Test-fire an ingestion job to verify it works immediately.
+
+Command:
+  npm run cloud:job:execute -- --job ncc-ingest-me --wait
+
+Expected output:
+  ✅ Job completed successfully!
+
+Alternative (async, faster):
+  npm run cloud:job:execute -- --job ncc-ingest-me
+
+Status: Waiting for you to run
+
+
+STEP 6: Verify Data Arrived
+----------------------------
+Check that new data appeared in BigQuery.
+
+Command:
+  npm run smoke
+
+Expected output:
+  Raw Emails: [higher number than before]
+  Last 24h: [shows new rows]
+  ✅ All systems operational
+
+Status: Waiting for you to run
+
+================================================================================
+ QUICK DEPLOYMENT (Copy/Paste All Commands)
+================================================================================
+
+# Deploy the fix (run these in order)
+npm run cloud:build
+npm run cloud:runner:apply
+npm run cloud:schedule:delete-old
+npm run cloud:schedule:apply
+npm run cloud:schedule:status
+npm run cloud:job:execute -- --job ncc-ingest-me --wait
+npm run smoke
+
+================================================================================
+ VERIFICATION CHECKLIST
+================================================================================
+
+After deployment, verify these conditions:
+
+[ ] npm run cloud:build succeeded (no errors)
+[ ] npm run cloud:runner:apply succeeded (runner service updated)
+[ ] npm run cloud:schedule:delete-old deleted 6 old schedulers
+[ ] npm run cloud:schedule:apply created 4 new schedulers
+[ ] npm run cloud:schedule:status shows all jobs ✅ ENABLED
+[ ] npm run cloud:job:execute test-fire succeeded
+[ ] npm run smoke shows emails ingested in last 24 hours
+[ ] Next scheduled runs are at 7:00 AM and 1:00 PM ET
+
+================================================================================
+ ONGOING MONITORING
+================================================================================
+
+Daily Check (30 seconds):
+  npm run cloud:schedule:status
+  
+  Look for:
+  - All jobs ✅ ENABLED (not ⏸️ PAUSED)
+  - Recent "Last run" times (not from days/weeks ago)
+  - Success indicators ✅ (not ❌)
+
+Weekly Check (2 minutes):
+  npm run smoke
+  
+  Look for:
+  - Raw Emails count increasing
+  - Last 24h showing new rows daily
+  - Chunk coverage: ~100%
+  - Embedding coverage: ~100%
+
+================================================================================
+ HOW TO CHANGE SCHEDULE (FUTURE)
+================================================================================
+
+To change ingestion times (e.g., 3x daily, different times):
+
+1. Edit: scripts/cloud/schedule-jobs.ts
+   - Modify the 'schedules' array
+   - Change cron expressions (format: 'minute hour * * *')
+   - Example: '0 8 * * *' = 8:00 AM daily
+
+2. Deploy:
+   npm run cloud:schedule:apply
+
+3. Verify:
+   npm run cloud:schedule:status
+
+Full guide: docs/SCHEDULER_MANAGEMENT.md
+
+================================================================================
+ TROUBLESHOOTING
+================================================================================
+
+Problem: "Job execution failed"
+Solution: Check runner health
+  curl https://ncc-jobs-runner-d6cqllgv7a-uc.a.run.app/health-check | jq
+  If error, redeploy: npm run cloud:runner:apply
+
+Problem: Schedulers show ❌ (failed)
+Solution: Check logs
+  gcloud logging read "resource.type=cloud_scheduler_job" --limit=10
+
+Problem: No new data after test-fire
+Solution: Check if Gmail has new emails
+  Ingestion is idempotent - skips already-ingested emails
+  If no new emails arrived, job succeeds with 0 inserts (normal)
+
+Problem: Gmail OAuth tokens expired
+Solution: Refresh tokens
+  npm run gmail:mint:me
+  npm run gmail:mint:other
+  npm run gmail:secret:me
+  npm run gmail:secret:other
+
+================================================================================
+ HELPFUL COMMANDS
+================================================================================
+
+Scheduler Management:
+  npm run cloud:schedule:status          # View all schedulers
+  npm run cloud:schedule:disable:apply   # Pause all schedulers
+  npm run cloud:schedule:enable:apply    # Resume all schedulers
+  npm run cloud:schedule:delete-old      # Delete old 3x daily jobs
+
+Job Execution:
+  npm run cloud:job:execute -- --job ncc-ingest-me
+  npm run cloud:job:execute -- --job ncc-ingest-me --wait
+  npm run cloud:job:execute -- --job ncc-ingest-other
+  npm run cloud:job:execute -- --job ncc-chunks
+  npm run cloud:job:execute -- --job ncc-embeddings
+
+Data Verification:
+  npm run smoke                          # BigQuery health check
+  npm run verify:ingestion               # Full ingestion health check
+
+Gmail Testing:
+  npm run gmail:test:me                  # Test 'me' inbox access
+  npm run gmail:test:other               # Test 'other' inbox access
+
+================================================================================
+ DOCUMENTATION
+================================================================================
+
+Created:
+  - docs/SCHEDULER_MANAGEMENT.md       # Comprehensive scheduler guide
+  - SCHEDULER_FIX_DEPLOYMENT.md        # Detailed deployment guide
+  - DEPLOYMENT_INSTRUCTIONS.txt        # This file (quick reference)
+
+Updated:
+  - docs/SCHEDULING_PLAN.md            # Reflects new 2x daily schedule
+  - package.json                       # New npm commands
+
+Code Changes:
+  - src/api/jobs-runner.ts             # Added ingestion to whitelist
+  - scripts/cloud/schedule-jobs.ts     # Changed to 2x daily
+  - scripts/cloud/scheduler-toggle.ts  # Added new job names
+
+New Scripts:
+  - scripts/cloud/scheduler-status.ts  # Status viewer
+  - scripts/cloud/job-execute.ts       # Manual executor
+  - scripts/cloud/delete-old-schedulers.ts  # Cleanup script
+
+================================================================================
+ CURRENT STATUS
+================================================================================
+
+Build Status: ✅ PASSED (npm run build succeeded)
+Runner Code: ✅ FIXED (whitelist updated)
+Schedule Config: ✅ UPDATED (2x daily)
+New Commands: ✅ ADDED (status, execute, delete-old)
+Documentation: ✅ COMPLETE
+
+Next Action: RUN THE DEPLOYMENT COMMANDS (see Step-by-Step section above)
+
+================================================================================
+
+Questions? See docs/SCHEDULER_MANAGEMENT.md for full details.
+
+Ready to deploy! Run the commands in STEP 1-6 above.
+
+================================================================================
+

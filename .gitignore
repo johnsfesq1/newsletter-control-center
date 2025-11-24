@@ -1,5 +1,10 @@
 .env
 .env.local
+.env.*.local
+token.json
+token.*.json
+service-account*.json
+*credentials*.json
 processing-progress.json
 *.log
 overnight-run*.log
@@ -22,3 +27,10 @@ Thumbs.db
 .gcloud/
 output/
 _archive/
+
+# secrets
+secrets/
+*.json
+*.p12
+*.pem
+.tokens/

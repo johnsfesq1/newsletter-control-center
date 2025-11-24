@@ -3,263 +3,194 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+// --- Types ---
+interface Citation {
+  chunk_id: string;
+  gmail_message_id: string;
+  chunk_index?: number;
+  citation: string;
+  publisher: string;
+  date: string | { value: string };
+  subject: string;
+}
+
 interface SemanticResult {
   query: string;
   answer: string;
-  citations: Array<{
-    chunk_id: string;
-    newsletter_id: string;
-    chunk_index?: number;
-    citation: string;
-    publisher: string;
-    date: any;
-    subject: string;
-  }>;
+  citations: Citation[];
   chunks_used: number;
   cost_usd: number;
-  chunks: Array<{
-    chunk_id: string;
-    newsletter_id: string;
-    subject: string;
-    publisher: string;
-    score: number;
-  }>;
-  publisher_rankings?: Array<{
-    publisher: string;
-    relevance_score: number;
-    chunk_count: number;
-    avg_score: number;
-    latest_date?: any;
-  }>;
 }
 
-export default function Home() {
+export default function Page() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SemanticResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [results, setResults] = useState<SemanticResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const searchSemantic = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
     setLoading(true);
-    setError('');
+    setError(null);
     setResults(null);
 
     try {
-      const response = await fetch('/api/intelligence/query', {
+      const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+
+      console.log('🚀 Sending search request:', {
+        url: '/api/intelligence/query',
+        query,
+        apiKeyPresent: !!apiKey,
+        apiKeyFirstChars: apiKey ? `${apiKey.substring(0, 10)}...` : 'none'
+      });
+
+      const res = await fetch('/api/intelligence/query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ query }),
       });
 
-      const data = await response.json();
+      console.log('📥 API Response Status:', res.status, res.statusText);
 
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Search failed');
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error('❌ API Error Response:', data);
+        throw new Error(data.error || data.message || `Search failed with status ${res.status}`);
       }
 
+      console.log('✅ Search successful:', data);
       setResults(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
-      setResults(null);
+    } catch (err: any) {
+      console.error('💥 Fetch/Handling Error:', err);
+      setError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateInput: any) => {
-    if (!dateInput) return 'Date unknown';
-    
-    if (dateInput && typeof dateInput === 'object' && dateInput.value) {
-      try {
-        return new Date(dateInput.value).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
-      } catch {
-        return 'Date unknown';
-      }
+  // Helper to format date safely
+  const formatDate = (d: any) => {
+    try {
+      const dateStr = typeof d === 'object' && d?.value ? d.value : d;
+      if (!dateStr) return 'Date unknown';
+      return new Date(dateStr).toLocaleDateString(undefined, { 
+        year: 'numeric', month: 'short', day: 'numeric' 
+      });
+    } catch {
+      return 'Date unknown';
     }
-    
-    if (typeof dateInput === 'string') {
-      try {
-        return new Date(dateInput).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
-      } catch {
-        return 'Date unknown';
-      }
-    }
-    
-    return 'Date unknown';
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Semantic Newsletter Search</h1>
-          <p className="text-gray-600">Ask questions and get intelligent answers from 69,673 newsletters</p>
-        </div>
+    <div className="min-h-screen p-8 max-w-4xl mx-auto">
+      {/* Header */}
+      <header className="mb-12 text-center">
+        <h1 className="text-3xl font-bold text-blue-900 mb-2">
+          Newsletter Intelligence
+        </h1>
+        <p className="text-gray-600">
+          Search 70k+ newsletters for strategic insights
+        </p>
+      </header>
 
-        {/* Search Form */}
-        <form onSubmit={searchSemantic} className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <div className="flex gap-4">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a question... (e.g., 'What are the latest developments in AI regulation?')"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading || !query.trim()}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-lg"
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
+      {/* Search Box */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
+        <form onSubmit={handleSearch} className="flex gap-3">
+          <input
+            type="text"
+            className="flex-1 border border-gray-300 rounded px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ask a question (e.g., 'What is the outlook for lithium mining?')"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            disabled={loading}
+          />
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="bg-blue-600 text-white px-8 py-3 rounded font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Searching...' : 'Search'}
+          </button>
         </form>
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-              <div className="h-4 bg-gray-200 rounded w-5/6 mx-auto"></div>
-            </div>
-            <p className="mt-6 text-gray-500">Searching 938,601 chunks with semantic embeddings...</p>
-          </div>
-        )}
-
-        {/* Results */}
-        {results && !loading && (
-          <div className="space-y-6">
-            {/* AI Answer */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Answer</h2>
-              <div className="prose max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
-                {results.answer}
-              </div>
-              <div className="mt-6 pt-4 border-t border-gray-200 text-sm text-gray-500">
-                Based on {results.chunks_used} relevant chunks • Cost: ${results.cost_usd.toFixed(4)}
-              </div>
-            </div>
-
-            {/* Citations */}
-            {results.citations && results.citations.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Sources ({results.citations.length})</h3>
-                <div className="space-y-3">
-                  {results.citations.map((citation, idx) => (
-                    <Link
-                      key={idx}
-                      href={`/newsletter/${citation.newsletter_id}${citation.chunk_index !== undefined ? `?highlight_chunk=${citation.chunk_index}` : ''}`}
-                      className="block border-l-4 border-blue-500 pl-4 py-2 hover:bg-blue-50 transition-colors rounded-r hover:shadow-sm"
-                    >
-                      <div className="font-medium text-gray-900 hover:text-blue-700">{citation.citation}</div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {formatDate(citation.date)}
-                      </div>
-                      <div className="text-xs text-blue-600 mt-1 opacity-75">
-                        Click to read full newsletter →
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Publisher Rankings */}
-            {results.publisher_rankings && results.publisher_rankings.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Top Publishers</h3>
-                <div className="space-y-3">
-                  {results.publisher_rankings.slice(0, 5).map((pub, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{pub.publisher}</div>
-                        <div className="text-sm text-gray-500">
-                          {pub.chunk_count} relevant {pub.chunk_count === 1 ? 'chunk' : 'chunks'}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-blue-600">
-                          {(pub.relevance_score * 100).toFixed(0)}%
-                        </div>
-                        <div className="text-xs text-gray-400">relevance</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Top Chunks */}
-            {results.chunks && results.chunks.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                  Relevant Newsletters ({results.chunks.length})
-                </h3>
-                <div className="space-y-3">
-                  {results.chunks.slice(0, 10).map((chunk, idx) => (
-                    <div key={chunk.chunk_id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 mb-1">{chunk.subject}</div>
-                          <div className="text-sm text-gray-500">{chunk.publisher}</div>
-                        </div>
-                        <div className="text-right ml-4">
-                          <Link
-                            href={`/newsletter/${chunk.newsletter_id}`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline block"
-                          >
-                            {(chunk.score).toFixed(0)}% match →
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* No Results State */}
-        {!loading && !results && !error && query && (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-gray-500 text-lg">No results found. Try a different query.</p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !results && !error && !query && (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-gray-500 text-lg">Enter a question above to search through 938,601 chunks from 69,673 newsletters.</p>
-            <div className="mt-4 text-sm text-gray-400">
-              Example: "What are the latest developments in AI regulation?"
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded mb-8">
+          <strong>Error:</strong> {error}
+          <p className="text-sm mt-2 text-red-600">Check console for full details.</p>
+        </div>
+      )}
+
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+        </div>
+      )}
+
+      {/* Results Display */}
+      {results && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          
+          {/* Answer Section */}
+          <section className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 border-b pb-2">
+              Intelligence Summary
+            </h2>
+            <div className="prose max-w-none text-gray-800 leading-relaxed whitespace-pre-wrap">
+              {results.answer}
+            </div>
+            <div className="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-500 flex justify-between">
+              <span>Based on {results.chunks_used} sources</span>
+              <span>Est. Cost: ${results.cost_usd.toFixed(4)}</span>
+            </div>
+          </section>
+
+          {/* Citations Section */}
+          <section>
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">
+              Sources Used
+            </h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              {results.citations.map((cit, idx) => (
+                <Link
+                  key={`${cit.gmail_message_id}-${idx}`}
+                  href={`/email/${cit.gmail_message_id}?highlight_chunk=${cit.chunk_index ?? 0}`}
+                  className="block bg-white p-4 rounded border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-1 rounded">
+                      {cit.publisher}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {formatDate(cit.date)}
+                    </span>
+                  </div>
+                  <h4 className="font-medium text-gray-900 group-hover:text-blue-700 line-clamp-2">
+                    {cit.subject}
+                  </h4>
+                  <div className="mt-3 text-xs text-gray-400 flex items-center">
+                    Read full issue →
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+        </div>
+      )}
     </div>
   );
 }

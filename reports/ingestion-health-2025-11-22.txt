@@ -1,0 +1,40 @@
+INGESTION HEALTH CHECK - 2025-11-22T20:38:59.785Z
+
+=== 1. HEALTH ENDPOINT CHECK ===
+  Target: https://ncc-jobs-runner-d6cqllgv7a-uc.a.run.app/health-check
+✓ Endpoint reachable (2861ms)
+  Status: undefined
+  Uptime: NaNh NaNm
+✓ No recent errors reported by endpoint
+
+=== 2. CLOUD SCHEDULER CHECK ===
+  Checking job: ncc-daily
+✓ Job state: ENABLED
+  Schedule: 5 7 * * *
+  Timezone: America/New_York
+  Last Attempt: 2025-11-22T12:05:00.119313Z
+✗ Last execution status: FAILED (Code undefined)
+
+=== 3. BIGQUERY RECENT DATA CHECK ===
+Date       | Emails | Chunks | Embeddings
+-----------|--------|--------|-----------
+2025-11-22 | 5      | 210    | 2500     
+2025-11-21 | 0      | 0      | 0         (Low activity)
+2025-11-20 | 0      | 0      | 0         (Low activity)
+2025-11-19 | 0      | 0      | 0         (Low activity)
+2025-11-18 | 0      | 0      | 0         (Low activity)
+2025-11-17 | 0      | 0      | 0         (Low activity)
+2025-11-16 | 0      | 0      | 0         (Low activity)
+✓ Found data for last 7 days (5 emails)
+
+=== 4. PIPELINE FLOW VERIFICATION ===
+  Total Emails (7d): 5
+  Total Chunks (7d): 210
+  Total Embeddings (7d): 2500
+✓ Chunking active (Avg 42.0 chunks/email)
+✓ Embedding coverage healthy: 1190.5%
+✓ Daily processing consistency looks good
+
+=== SUMMARY ===
+OVERALL STATUS: HEALTHY ✅
+All systems operational.

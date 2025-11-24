@@ -1,6 +1,16 @@
 # newsletter-control-center
 A briefing service based on my newsletters
 
+## 🎯 Project Status
+
+**Phase 1 Complete:** ✅ RAG Core Pipeline (2025-11-23)
+- Query pipeline with two-stage filtering operational
+- Test suite: 100% passing (crypto rejection + 3 golden queries)
+- Documentation: Complete implementation guide and test specifications
+- **Next**: Phase 2 - Gemini integration (answer generation + API endpoint)
+
+See `CURRENT_STATE.md` for detailed status.
+
 ## Environment Setup
 
 ### Authentication

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
 const PROJECT_ID = process.env.BIGQUERY_PROJECT_ID || 'newsletter-control-center';
-const DATASET_ID = 'ncc_newsletters';
+const DATASET_ID = 'ncc_production';
 const CHUNKS_TABLE = 'chunks';
-const LOCATION = 'us-central1';
+const BIGQUERY_LOCATION = 'US';  // BigQuery dataset is in US multi-region
+const VERTEX_LOCATION = 'us-central1';  // Vertex AI models require a specific region
 
 // Budget configuration
 const DAILY_BUDGET_USD = 10.00; // Max spend per day
@@ -43,13 +44,15 @@ function checkDailyBudget(cost: number): boolean {
  */
 async function generateEmbedding(text: string): Promise<number[]> {
   const { GoogleAuth } = require('google-auth-library');
+  
+  // Using Application Default Credentials (ADC) - run `gcloud auth application-default login` first
   const auth = new GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   });
   const client = await auth.getClient();
   const accessToken = await client.getAccessToken();
 
-  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/text-embedding-004:predict`;
+  const endpoint = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${VERTEX_LOCATION}/publishers/google/models/text-embedding-004:predict`;
   
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -85,8 +88,20 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Vector search using cosine distance
- * Since we don't have VECTOR_SEARCH built-in yet, we'll use cosine similarity
+ * Vector search using cosine distance across normalized tables
+ * 
+ * Database Schema Note:
+ * - `chunk_embeddings` contains the 768-dimensional vectors (model: text-embedding-004)
+ * - `chunks` contains the text content and metadata (gmail_message_id, chunk_index)
+ * - `raw_emails` contains email metadata (subject, sent_date, from_email as publisher)
+ * - Publisher info comes from raw_emails.from_email (publishers table is unpopulated)
+ * 
+ * Join Flow: chunk_embeddings -> chunks (chunk_id) -> raw_emails (gmail_message_id)
+ * 
+ * @param bigquery - BigQuery client instance
+ * @param queryEmbedding - 768-dimensional query embedding from text-embedding-004
+ * @param topK - Number of top results to return (default: 20)
+ * @returns Array of chunks with text, metadata, and cosine distance scores
  */
 async function vectorSearch(
   bigquery: BigQuery, 
@@ -103,44 +118,62 @@ async function vectorSearch(
     ),
     chunk_distances AS (
       SELECT
-        c.chunk_id,
-        c.newsletter_id,
+        ce.chunk_id,
+        c.gmail_message_id,
         c.chunk_index,
         c.chunk_text,
-        c.subject,
-        c.publisher_name,
-        c.sent_date,
         -- Cosine similarity calculation
         1 - (
           SELECT SUM(a * b) / (SQRT(SUM(a * a)) * SQRT(SUM(b * b)))
           FROM 
             UNNEST(query_embedding.embedding) AS a WITH OFFSET i
             JOIN 
-            UNNEST(c.chunk_embedding) AS b WITH OFFSET j
+            UNNEST(ce.embedding) AS b WITH OFFSET j
           WHERE i = j
         ) AS distance
-      FROM \`${PROJECT_ID}.${DATASET_ID}.${CHUNKS_TABLE}\` c, query_embedding
+      FROM \`${PROJECT_ID}.${DATASET_ID}.chunk_embeddings\` ce
+      CROSS JOIN query_embedding
+      JOIN \`${PROJECT_ID}.${DATASET_ID}.chunks\` c
+        ON ce.chunk_id = c.chunk_id
+      WHERE c.is_junk IS NOT TRUE  -- Filter out junk chunks
     )
     SELECT 
-      chunk_id,
-      newsletter_id,
-      chunk_index,
-      chunk_text,
-      subject,
-      publisher_name,
-      sent_date,
-      distance
-    FROM chunk_distances
-    ORDER BY distance ASC
+      cd.chunk_id,
+      cd.gmail_message_id,
+      cd.chunk_index,
+      cd.chunk_text,
+      re.subject,
+      re.from_email AS publisher_name,
+      re.sent_date,
+      cd.distance
+    FROM chunk_distances cd
+    JOIN \`${PROJECT_ID}.${DATASET_ID}.raw_emails\` re
+      ON cd.gmail_message_id = re.gmail_message_id
+    ORDER BY cd.distance ASC
     LIMIT ${topK}
   `;
 
-  const [rows] = await bigquery.query(query);
+  const [rows] = await bigquery.query({
+    query: query,
+    location: BIGQUERY_LOCATION
+  });
   return rows;
 }
 
 /**
- * Keyword search (full-text search)
+ * Keyword search (full-text search) across normalized tables
+ * 
+ * Database Schema Note:
+ * - Searches across both `chunk_text` in chunks and `subject` in raw_emails
+ * - Filters out junk chunks (is_junk = TRUE)
+ * - Returns relevance score based on keyword frequency
+ * 
+ * Join Flow: chunks -> raw_emails (gmail_message_id)
+ * 
+ * @param bigquery - BigQuery client instance
+ * @param query - Search query string
+ * @param topK - Number of top results to return (default: 20)
+ * @returns Array of chunks with text, metadata, and relevance scores
  */
 async function keywordSearch(
   bigquery: BigQuery,
@@ -151,7 +184,6 @@ async function keywordSearch(
   const escapedQuery = query.replace(/'/g, "''");
   
   // Only perform keyword search if query doesn't have apostrophes
-  // or if it's a simple keyword match
   if (query.includes("'")) {
     // Skip keyword search for queries with apostrophes to avoid SQL errors
     return [];
@@ -159,27 +191,35 @@ async function keywordSearch(
   
   const searchQuery = `
     SELECT
-      chunk_id,
-      newsletter_id,
-      chunk_index,
-      chunk_text,
-      subject,
-      publisher_name,
-      sent_date,
+      c.chunk_id,
+      c.gmail_message_id,
+      c.chunk_index,
+      c.chunk_text,
+      re.subject,
+      re.from_email AS publisher_name,
+      re.sent_date,
       -- Simple relevance score based on keyword frequency
       (
-        (LENGTH(chunk_text) - LENGTH(REPLACE(LOWER(chunk_text), LOWER('${escapedQuery}'), ''))) 
+        (LENGTH(c.chunk_text) - LENGTH(REPLACE(LOWER(c.chunk_text), LOWER('${escapedQuery}'), ''))) 
         / LENGTH('${escapedQuery}')
       ) AS relevance
-    FROM \`${PROJECT_ID}.${DATASET_ID}.${CHUNKS_TABLE}\`
-    WHERE LOWER(chunk_text) LIKE LOWER('%${escapedQuery}%')
-      OR LOWER(subject) LIKE LOWER('%${escapedQuery}%')
+    FROM \`${PROJECT_ID}.${DATASET_ID}.chunks\` c
+    JOIN \`${PROJECT_ID}.${DATASET_ID}.raw_emails\` re
+      ON c.gmail_message_id = re.gmail_message_id
+    WHERE c.is_junk IS NOT TRUE
+      AND (
+        LOWER(c.chunk_text) LIKE LOWER('%${escapedQuery}%')
+        OR LOWER(re.subject) LIKE LOWER('%${escapedQuery}%')
+      )
     ORDER BY relevance DESC
     LIMIT ${topK}
   `;
 
   try {
-    const [rows] = await bigquery.query(searchQuery);
+    const [rows] = await bigquery.query({
+      query: searchQuery,
+      location: BIGQUERY_LOCATION
+    });
     return rows;
   } catch (error) {
     // If keyword search fails, just return empty results
@@ -283,25 +323,37 @@ async function hybridSearch(
 }
 
 /**
- * Fetch full chunk text from BigQuery
+ * Fetch full chunk text from BigQuery with JOINs
+ * Joins: chunks -> raw_emails -> publishers
  */
 async function getFullChunks(bigquery: BigQuery, chunkIds: string[]): Promise<any[]> {
+  // Guard clause: return empty array if no chunk IDs provided
+  if (!chunkIds || chunkIds.length === 0) {
+    console.warn('⚠️  getFullChunks called with empty chunk ID array');
+    return [];
+  }
+  
   const ids = chunkIds.map(id => `'${id}'`).join(',');
   
   const query = `
     SELECT 
-      chunk_id,
-      newsletter_id,
-      chunk_index,
-      chunk_text,
-      subject,
-      publisher_name,
-      sent_date
-    FROM \`${PROJECT_ID}.${DATASET_ID}.${CHUNKS_TABLE}\`
-    WHERE chunk_id IN (${ids})
+      c.chunk_id,
+      c.gmail_message_id,
+      c.chunk_index,
+      c.chunk_text,
+      re.subject,
+      re.from_email AS publisher_name,
+      re.sent_date
+    FROM \`${PROJECT_ID}.${DATASET_ID}.chunks\` c
+    JOIN \`${PROJECT_ID}.${DATASET_ID}.raw_emails\` re
+      ON c.gmail_message_id = re.gmail_message_id
+    WHERE c.chunk_id IN (${ids})
   `;
 
-  const [rows] = await bigquery.query(query);
+  const [rows] = await bigquery.query({
+    query: query,
+    location: BIGQUERY_LOCATION
+  });
   return rows;
 }
 
@@ -310,6 +362,8 @@ async function getFullChunks(bigquery: BigQuery, chunkIds: string[]): Promise<an
  */
 async function extractFacts(chunks: any[], userQuery: string): Promise<{facts: any[], tokens_in: number, tokens_out: number}> {
   const { GoogleAuth } = require('google-auth-library');
+  
+  // Using Application Default Credentials (ADC) - run `gcloud auth application-default login` first
   const auth = new GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   });
@@ -338,7 +392,7 @@ ${context}
 
 Return ONLY valid JSON, no additional text:`;
 
-  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
+  const endpoint = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${VERTEX_LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
   
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -355,7 +409,7 @@ Return ONLY valid JSON, no additional text:`;
         temperature: 0.1,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,  // Increased to maximum to prevent truncation
         responseMimeType: 'application/json'
       }
     })
@@ -374,7 +428,7 @@ Return ONLY valid JSON, no additional text:`;
   const tokensIn = usageMetadata.promptTokenCount || 0;
   const tokensOut = usageMetadata.candidatesTokenCount || 0;
   
-  // Try to parse as JSON, fallback to empty array
+  // Try to parse as JSON with truncation repair
   try {
     const facts = JSON.parse(text);
     return {
@@ -383,7 +437,28 @@ Return ONLY valid JSON, no additional text:`;
       tokens_out: tokensOut
     };
   } catch (error) {
-    console.warn('Failed to parse facts as JSON:', text);
+    console.warn('⚠️  Initial JSON parse failed, attempting truncation repair...');
+    
+    // Attempt to repair truncated JSON by finding last valid closing
+    try {
+      const lastValidEnd = text.lastIndexOf('}]');
+      if (lastValidEnd !== -1) {
+        const repairedText = text.substring(0, lastValidEnd + 2);
+        console.log('🔧 Attempting to parse repaired JSON (truncated at last }])');
+        const facts = JSON.parse(repairedText);
+        console.log(`✅ Successfully repaired and parsed ${facts.length} facts`);
+        return {
+          facts: Array.isArray(facts) ? facts : [],
+          tokens_in: tokensIn,
+          tokens_out: tokensOut
+        };
+      }
+    } catch (repairError) {
+      console.warn('❌ Truncation repair failed:', repairError);
+    }
+    
+    // Final fallback: return empty array
+    console.warn('⚠️  Returning empty facts array due to unparseable response');
     return {
       facts: [],
       tokens_in: tokensIn,
@@ -488,6 +563,8 @@ async function synthesizeAnswer(facts: any[], userQuery: string, chunks: any[]):
   }
 
   const { GoogleAuth } = require('google-auth-library');
+  
+  // Using Application Default Credentials (ADC) - run `gcloud auth application-default login` first
   const auth = new GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   });
@@ -517,7 +594,7 @@ CRITICAL RULES:
 
 Provide your answer:`;
 
-  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
+  const endpoint = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${VERTEX_LOCATION}/publishers/google/models/gemini-2.5-pro:generateContent`;
   
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -534,7 +611,7 @@ Provide your answer:`;
         temperature: 0.3,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 4096
+        maxOutputTokens: 8192  // Increased to maximum to prevent truncation
       }
     })
   });
@@ -560,6 +637,9 @@ Provide your answer:`;
 }
 
 export async function POST(request: NextRequest) {
+  // Using Application Default Credentials (ADC) - run `gcloud auth application-default login` first
+  console.log(`🔑 Using Application Default Credentials (ADC)`);
+  
   try {
     const { query } = await request.json();
 
@@ -572,7 +652,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Processing query: "${query}"`);
 
-    const bigquery = new BigQuery({ projectId: PROJECT_ID });
+    const bigquery = new BigQuery({ 
+      projectId: PROJECT_ID,
+      location: BIGQUERY_LOCATION  // Dataset location (multi-region)
+    });
     
     // Note: We can't check budget before processing since we don't know the cost yet
     // Will check after calculating actual cost
@@ -602,7 +685,7 @@ export async function POST(request: NextRequest) {
     const synthResult = await synthesizeAnswer(extractResult.facts, query, fullChunks);
     console.log(`✅ Generated answer`);
     
-    // Format citations for response with newsletter_id for linking
+    // Format citations for response with gmail_message_id for linking
     const citations = Array.from(new Set(
       extractResult.facts.map(f => {
         const chunk = fullChunks.find(c => c.chunk_id === f.chunk_id);
@@ -613,8 +696,8 @@ export async function POST(request: NextRequest) {
       if (!chunk) return null;
       return {
         chunk_id: chunk.chunk_id,
-        newsletter_id: chunk.newsletter_id, // Add for linking
-        chunk_index: chunk.chunk_index, // Add for highlighting specific chunk
+        gmail_message_id: chunk.gmail_message_id, // Email identifier
+        chunk_index: chunk.chunk_index, // For highlighting specific chunk
         citation: formatCitation(chunk),
         publisher: chunk.publisher_name,
         date: chunk.sent_date,
@@ -644,7 +727,7 @@ export async function POST(request: NextRequest) {
       tokens_out: totalTokensOut,
       chunks: chunks.map(c => ({
         chunk_id: c.chunk_id,
-        newsletter_id: c.newsletter_id, // Add for linking
+        gmail_message_id: c.gmail_message_id, // Email identifier
         subject: c.subject,
         publisher: c.publisher_name,
         score: (c.normalized_score || c.combined_score || (1 - c.distance)) * 100 // Convert to percentage
@@ -655,10 +738,28 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Query failed:', error);
+    
+    // Enhanced error details
+    const errorDetails: any = {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    };
+    
+    // Check for common auth errors
+    if (errorDetails.message.includes('ENOENT') || errorDetails.message.includes('.json') || errorDetails.message.includes('credentials')) {
+      errorDetails.hint = 'Missing Google Cloud credentials. Set GOOGLE_APPLICATION_CREDENTIALS environment variable in .env.local';
+      errorDetails.docs = 'https://cloud.google.com/docs/authentication/application-default-credentials';
+    }
+    
+    // Check for quota/budget errors
+    if (errorDetails.message.includes('quota') || errorDetails.message.includes('budget')) {
+      errorDetails.hint = 'Daily budget exceeded or API quota reached.';
+    }
+    
     return NextResponse.json(
       { 
         error: 'Query failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorDetails
       },
       { status: 500 }
     );

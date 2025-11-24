@@ -1,0 +1,23 @@
+INGESTION HEALTH CHECK - 2025-11-23T14:11:37.834Z
+
+=== 1. HEALTH ENDPOINT CHECK ===
+  Target: https://ncc-jobs-runner-d6cqllgv7a-uc.a.run.app/health-check
+✗ Failed to connect: fetch failed
+
+=== 2. CLOUD SCHEDULER CHECK ===
+  Checking job: ncc-daily
+✗ Could not fetch scheduler job: Command failed: gcloud scheduler jobs describe ncc-daily --location=us-central1 --project=newsletter-control-center --format=json
+  Make sure you are authenticated with gcloud and have permissions.
+
+=== 3. BIGQUERY RECENT DATA CHECK ===
+✗ BigQuery check failed: The file at /Users/jsf/.gcloud/newsletter-local-dev-key.json does not exist, or it is not a file. ENOENT: no such file or directory, lstat '/Users/jsf/.gcloud/newsletter-local-dev-key.json'
+
+=== 4. PIPELINE FLOW VERIFICATION ===
+  Skipping flow verification due to missing data.
+
+=== SUMMARY ===
+OVERALL STATUS: ISSUES DETECTED ❌
+- Health Endpoint Unreachable
+- Cloud Scheduler Issue
+- BigQuery Check Failed
+- Pipeline Flow Issues

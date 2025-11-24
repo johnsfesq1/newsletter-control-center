@@ -1,0 +1,21 @@
+# .gcloudignore - ensure package.json is included
+# Override default patterns to include necessary files
+
+# Include package files
+!package.json
+!package-lock.json
+
+# Ignore common development files
+node_modules/
+.git/
+.gitignore
+.env
+.env.local
+*.log
+.DS_Store
+
+# Keep source code
+!src/
+!scripts/
+!tsconfig.json
+

@@ -1,0 +1,188 @@
+[dotenv@17.2.3] injecting env (7) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+🔍 STARTING RAG REJECTION DEBUG
+
+Timestamp: 2025-11-23T19:54:17.367Z
+============================================================
+
+🧐 ANALYZING QUERY: "What predictions have been made about Taiwan's semiconductor industry?"
+------------------------------------------------------------
+(node:67318) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+📊 STAGE 1: Vector Search Results
+   Found 10 chunks (limit 10)
+
+   Top 5 Chunks by Similarity:
+   [1] Score: 0.8555 | ID: 293e149d...
+       Subject: "Taiwan: A Case Study in Resilience and Innovation"
+       Preview: "rced the centrality of the semiconductor industry in Taiwan’s economic and geopolitical positioning...."
+   [2] Score: 0.8528 | ID: d9af6346...
+       Subject: "Taiwan vs. US Chip Subsidies: Bolstering the Sacred Mountain"
+       Preview: "se policymakers trust the semiconductor industry to use subsidies without heavy-handed restrictions...."
+   [3] Score: 0.8313 | ID: 0784e262...
+       Subject: "Taiwan Fears Trump Could ‘Steal’ Crown Jewel TSMC"
+       Preview: "and China, which made the U. S. realize its severe lack of domestic chip manufacturing capabilities...."
+   [4] Score: 0.8270 | ID: 64564b7b...
+       Subject: "“Victory will ultimately belong to the heroic Chinese people!”; CEWC; Consumption plan; YMTC; 县委大院"
+       Preview: "eting last week.But experts and officials have repeatedly said there should be no cause for concern...."
+   [5] Score: 0.8231 | ID: c9fa9760...
+       Subject: "What Does the Future Hold for Taiwan and Semiconductors?"
+       Preview: "The semiconductor space is changing, so how is Taiwan planning to stay on top?https://zeihan. com** ..."
+
+🛡️ STAGE 2: Relevance Filtering
+   Passed Stage 2: 8
+   Rejected in Stage 2: 2
+
+   ⚠️ Rejected Chunk Analysis (Why did they fail?):
+   [Rejected #1] Sim: 0.8270 | Rel: 0.4714 (Threshold: 0.5)
+       Subject: "“Victory will ultimately belong to the heroic Chinese people!”; CEWC; Consumption plan; YMTC; 县委大院"
+       Text: "eting last week.But experts and officials have repeatedly said there should be no cause for concern.  Taiwan’s Economic Affairs Minister Wang Mei-hua ..."
+       Matches found: [have, semiconductor]
+   [Rejected #2] Sim: 0.8164 | Rel: 0.4714 (Threshold: 0.5)
+       Subject: "China-Central Asia Summit; EU frustrations; China at the World Health Assembly"
+       Text: "lped transform Taiwan Semiconductor Manufacturing Co. into the world’s most advanced chip operation.  “This recent shift marks a substantive move towa..."
+       Matches found: [semiconductor]
+
+🏁 FINAL DECISION
+   Confidence: high
+   Should Answer: true
+   Reason: Found 8 highly relevant sources
+
+🤔 HYPOTHESIS:
+   Success: Found 8 relevant chunks.
+
+============================================================
+
+🧐 ANALYZING QUERY: "How do newsletters describe India's economic growth and potential?"
+------------------------------------------------------------
+
+📊 STAGE 1: Vector Search Results
+   Found 10 chunks (limit 10)
+
+   Top 5 Chunks by Similarity:
+   [1] Score: 0.7846 | ID: ac9af513...
+       Subject: "Feeling Good Again"
+       Preview: "ck here to share via email (mailto:email@here? subject=I%20think%20you'd%20love%20this%20newsletter!..."
+   [2] Score: 0.7775 | ID: 7fae06e6...
+       Subject: "Can Modi Deliver for India?"
+       Preview: "dend” to turn India into an economic superpower? Below are some of the highlights of WPR’s coverage...."
+   [3] Score: 0.7694 | ID: 98dda44e...
+       Subject: "Green metals, bloodsports, skeletons, bonds & Critical Theory"
+       Preview: "t takes a lot of work! What sustains that effort are voluntary subscriptions from paying supporters...."
+   [4] Score: 0.7679 | ID: 51a855be...
+       Subject: "The Macro Weekly - Edition 8"
+       Preview: "‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ..."
+   [5] Score: 0.7673 | ID: 950ef960...
+       Subject: "The Macro Weekly - Edition 7"
+       Preview: "‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ..."
+
+🛡️ STAGE 2: Relevance Filtering
+   Passed Stage 2: 2
+   Rejected in Stage 2: 8
+
+   ⚠️ Rejected Chunk Analysis (Why did they fail?):
+   [Rejected #1] Sim: 0.7694 | Rel: 0.4000 (Threshold: 0.5)
+       Subject: "Green metals, bloodsports, skeletons, bonds & Critical Theory"
+       Text: "t takes a lot of work! What sustains that effort are voluntary subscriptions from paying supporters.  As a thank you, several times per week, paying s..."
+       Matches found: []
+   [Rejected #2] Sim: 0.7679 | Rel: 0.0000 (Threshold: 0.5)
+       Subject: "The Macro Weekly - Edition 8"
+       Text: "‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ..."
+       Matches found: []
+   [Rejected #3] Sim: 0.7673 | Rel: 0.0000 (Threshold: 0.5)
+       Subject: "The Macro Weekly - Edition 7"
+       Text: "‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ..."
+       Matches found: []
+   [Rejected #4] Sim: 0.7659 | Rel: 0.0000 (Threshold: 0.5)
+       Subject: "Chartbook 219 The triple inequality of the "global" climate problem."
+       Text: "veloping world. They see the path to development and the route of poverty closing before their eyes.  ***Thank you for reading Chartbook Newsletter. I..."
+       Matches found: []
+   [Rejected #5] Sim: 0.7644 | Rel: 0.0000 (Threshold: 0.5)
+       Subject: "The Macro Weekly - Edition 9"
+       Text: "‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ..."
+       Matches found: []
+   [Rejected #6] Sim: 0.7638 | Rel: 0.0000 (Threshold: 0.5)
+       Subject: "The Macro Weekly #11"
+       Text: "‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ..."
+       Matches found: []
+   [Rejected #7] Sim: 0.7618 | Rel: 0.0000 (Threshold: 0.5)
+       Subject: "Today's newsletter: Seeking Balance"
+       Text: "News Media: An Ever Changing Tide Today's newsletter: Seeking Balance Musings at the intersection of business, finance & tech.1-click subscribe Next n..."
+       Matches found: []
+   [Rejected #8] Sim: 0.7612 | Rel: 0.5000 (Threshold: 0.5)
+       Subject: "The EU’s debt crackdown, U.S.-China semiconductor war, and more"
+       Text: "nner of women’s rights. Read more. India May Not Have What It Takes to Be a Great Power July 19, 2024 | India has all the economic makings of a future..."
+       Matches found: [economic]
+
+🏁 FINAL DECISION
+   Confidence: none
+   Should Answer: false
+   Reason: Insufficient relevant data (only 2 relevant chunks found)
+
+🤔 HYPOTHESIS:
+   Success: Found 2 relevant chunks.
+
+============================================================
+
+🧐 ANALYZING QUERY: "Compare how different analysts view China's economic challenges."
+------------------------------------------------------------
+
+📊 STAGE 1: Vector Search Results
+   Found 10 chunks (limit 10)
+
+   Top 5 Chunks by Similarity:
+   [1] Score: 0.8420 | ID: 93f4afb6...
+       Subject: "The World Next Week: Israel-Lebanon escalation risks"
+       Preview: "e being directed to tackle it and the potential trajectories for the Chinese economy going forwards...."
+   [2] Score: 0.8420 | ID: d45434fd...
+       Subject: "The World Next Week: The Gaza war and cyber failings"
+       Preview: "e being directed to tackle it and the potential trajectories for the Chinese economy going forwards...."
+   [3] Score: 0.8420 | ID: f4eb1635...
+       Subject: "The World Next Week: Obstacles to multilateralism"
+       Preview: "e being directed to tackle it and the potential trajectories for the Chinese economy going forwards...."
+   [4] Score: 0.8308 | ID: 91505b71...
+       Subject: "Xi's South Africa Visit - Key Deals Signed - No Endorsement of GDI, GSI & GCI in Joint Statement - Xi's Cold War W…"
+       Preview: "发展拓展新空间.He then offers the “correct” view on the difficulties and challenges facing China’s economy...."
+   [5] Score: 0.8274 | ID: b1088a66...
+       Subject: "PLAAF's 75th Anniversary - Ren Ping Article on Economy: 'Pain of Transformation Cannot be Avoided or Circumvented'…"
+       Preview: "espectively推动结构调整，当多一份进取心。今年前三季度，服务业占GDP比重比去年同期上升0.3个百分点，对经济增长的贡献率达53.9%；高技术产业投资同比增长10.0%，增速比全部投资高6...."
+
+🛡️ STAGE 2: Relevance Filtering
+   Passed Stage 2: 4
+   Rejected in Stage 2: 6
+
+   ⚠️ Rejected Chunk Analysis (Why did they fail?):
+   [Rejected #1] Sim: 0.8420 | Rel: 0.3857 (Threshold: 0.5)
+       Subject: "The World Next Week: Israel-Lebanon escalation risks"
+       Text: "e being directed to tackle it and the potential trajectories for the Chinese economy going forwards.  Oxford Analytica Daily BriefThe Daily Brief deli..."
+       Matches found: [analysts]
+   [Rejected #2] Sim: 0.8420 | Rel: 0.3857 (Threshold: 0.5)
+       Subject: "The World Next Week: The Gaza war and cyber failings"
+       Text: "e being directed to tackle it and the potential trajectories for the Chinese economy going forwards.  Oxford Analytica Daily BriefThe Daily Brief deli..."
+       Matches found: [analysts]
+   [Rejected #3] Sim: 0.8420 | Rel: 0.3857 (Threshold: 0.5)
+       Subject: "The World Next Week: Obstacles to multilateralism"
+       Text: "e being directed to tackle it and the potential trajectories for the Chinese economy going forwards.  Oxford Analytica Daily BriefThe Daily Brief deli..."
+       Matches found: [analysts]
+   [Rejected #4] Sim: 0.8274 | Rel: 0.4714 (Threshold: 0.5)
+       Subject: "PLAAF's 75th Anniversary - Ren Ping Article on Economy: 'Pain of Transformation Cannot be Avoided or Circumvented'…"
+       Text: "espectively推动结构调整，当多一份进取心。今年前三季度，服务业占GDP比重比去年同期上升0.3个百分点，对经济增长的贡献率达53.9%；高技术产业投资同比增长10.0%，增速比全部投资高6.  6个百分点，连续7个月保持两位数增长，为新质生产力加快形成和经济结构加快转型升级提供有力支撑。化..."
+       Matches found: [economic]
+   [Rejected #5] Sim: 0.8172 | Rel: 0.4714 (Threshold: 0.5)
+       Subject: "Lockdown-weary consumers pull back under Covid-zero, Pelosi leaves for Asia tour with no word on Taiwan & $52 bill…"
+       Text: "ously “massaged” demographic figures. Excellent.China’s economic inequality is worse than America’s.  And the pandemic hasn’t helped. [(Lili Pike, Gri..."
+       Matches found: [china's, economic]
+   [Rejected #6] Sim: 0.8161 | Rel: 0.4714 (Threshold: 0.5)
+       Subject: "Beidaihe break over; New Xi books; Support for real estate; Liu Jianchao; PRC-India"
+       Text: " large numbers, changing demographics and less catch-up potential as an upper-middle-income country.  The other is that China’s economy has recently b..."
+       Matches found: [economic]
+
+🏁 FINAL DECISION
+   Confidence: high
+   Should Answer: true
+   Reason: Found 4 highly relevant sources
+
+🤔 HYPOTHESIS:
+   Success: Found 4 relevant chunks.
+
+============================================================
