@@ -1,9 +1,130 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Basic resets */
+:root {
+  --background: 0 0% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 6%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 6%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 142 76% 36%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 14.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 14.9%;
+  --muted-foreground: 0 0% 63.9%;
+  --accent: 0 0% 14.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 14.9%;
+  --input: 0 0% 14.9%;
+  --ring: 142 76% 36%;
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
 body {
-  background-color: #f3f4f6; /* gray-100 */
-  color: #1f2937; /* gray-800 */
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Serif font for narrative text */
+.font-narrative {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+/* Monospace for technical elements */
+.font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(0 0% 9%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 25%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 35%);
+}
+
+/* Prose styling for markdown content - using plain CSS instead of @apply */
+.prose-narrative {
+  color: #e4e4e7; /* zinc-200 */
+  line-height: 1.625;
+}
+
+.prose-narrative h1,
+.prose-narrative h2,
+.prose-narrative h3 {
+  color: #f4f4f5; /* zinc-100 */
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-narrative p {
+  margin-bottom: 1rem;
+}
+
+.prose-narrative ul,
+.prose-narrative ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.prose-narrative li {
+  margin-bottom: 0.5rem;
+}
+
+.prose-narrative strong {
+  color: #f4f4f5; /* zinc-100 */
+  font-weight: 600;
+}
+
+.prose-narrative a {
+  color: #34d399; /* emerald-400 */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-narrative a:hover {
+  color: #6ee7b7; /* emerald-300 */
+}
+
+.prose-narrative blockquote {
+  border-left: 2px solid #3f3f46; /* zinc-700 */
+  padding-left: 1rem;
+  font-style: italic;
+  color: #a1a1aa; /* zinc-400 */
+}
+
+.prose-narrative code {
+  background-color: #27272a; /* zinc-800 */
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: #34d399; /* emerald-400 */
 }

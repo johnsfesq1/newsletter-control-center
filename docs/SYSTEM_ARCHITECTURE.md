@@ -300,31 +300,40 @@ newsletter-search/
 │   │   ├── api/
 │   │   │   └── intelligence/
 │   │   │       └── query/
-│   │   │           └── route.ts    ← Main RAG logic (769 lines)
-│   │   ├── page.tsx                ← Simple search UI
-│   │   └── globals.css
+│   │   │           └── route.ts       ← Main RAG logic (769 lines)
+│   │   ├── page.tsx                   ← Glass Cockpit UI (3-zone layout)
+│   │   ├── layout.tsx                 ← Root layout with fonts
+│   │   └── globals.css                ← Dark theme + prose styles
+│   ├── components/
+│   │   ├── search-input.tsx           ← Animated Command Deck (hero-to-sticky)
+│   │   ├── process-theater.tsx        ← 4-stage latency visualization
+│   │   ├── narrative-panel.tsx        ← Markdown synthesis display
+│   │   └── evidence-card.tsx          ← Citation card component
 │   └── lib/
-│       └── (future shared utilities)
-├── .env.local                       ← GOOGLE_APPLICATION_CREDENTIALS (if needed)
+│       └── utils.ts                   ← cn() helper for Tailwind
+├── .env.local                         ← API config (no credentials needed)
 ├── package.json
 └── next.config.js
 
 docs/
-├── SYSTEM_ARCHITECTURE.md           ← This file
-├── DEV_RUNBOOK.md                   ← Developer guide (see next)
-├── PHASE2_COMPLETION.md             ← Historical: RAG build summary
-└── RAG_*.md                         ← Historical: Investigation notes
+├── SYSTEM_ARCHITECTURE.md             ← This file
+├── DEV_RUNBOOK.md                     ← Developer guide
+├── VISION_NORTH_STAR.md               ← Intelligence Engine philosophy
+├── UI_GLASS_COCKPIT.md                ← UI design system spec
+├── PHASE_1_LOG.md                     ← Phase 1 completion log
+└── (archived docs)
 
 secrets/
 └── gcp/
-    └── ncc-local-dev.json           ← Service account key (not used in dev)
+    └── ncc-local-dev.json             ← Service account key (not used in dev)
 ```
 
 ---
 
 ## Technology Stack
 
-- **Frontend:** Next.js 16, React 18, Tailwind CSS
+- **Frontend:** Next.js 16 (App Router), Tailwind CSS v4, Framer Motion
+- **UI Components:** React 19, Lucide React (icons), React Markdown
 - **Backend:** Next.js API Routes (Node.js)
 - **Database:** Google BigQuery (US multi-region)
 - **AI/ML:** Google Vertex AI (us-central1)
@@ -379,10 +388,52 @@ BIGQUERY_PROJECT_ID=newsletter-control-center
 
 ---
 
+## UI Architecture (The Glass Cockpit)
+
+The frontend implements a "Glass Cockpit" design inspired by Bloomberg Terminal and Linear.app.
+
+### 3-Zone Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ZONE A: Command Deck (Sticky Header)                   │
+│  - SearchInput component with hero-to-sticky animation  │
+│  - Status badge showing cost/model info                 │
+├─────────────────────────────────┬───────────────────────┤
+│  ZONE B: Synthesis Plane (60%)  │  ZONE C: Evidence     │
+│  - NarrativePanel component     │  Rail (40%)           │
+│  - Serif typography (Playfair)  │  - EvidenceCard list  │
+│  - Markdown rendering           │  - Darker background  │
+│  - Citation anchors [1] [2]     │  - Scrollable feed    │
+└─────────────────────────────────┴───────────────────────┘
+```
+
+### Process Theater (Latency Visualization)
+
+The 8-second query latency is visualized as a 4-stage "thinking" animation:
+
+| Stage | Time | Label | Visual |
+|-------|------|-------|--------|
+| 1 | 0-2s | "Scanning Vector Space..." | Radar sweep animation |
+| 2 | 2-5s | "Triangulating Sources..." | Chunk counter ticking up |
+| 3 | 5-7s | "Extracting Facts..." | Analyzing pulse effect |
+| 4 | 7-8s | "Synthesizing Narrative..." | Fade to results |
+
+### Design Tokens
+
+- **Background:** `zinc-950` (near-black)
+- **Borders:** `zinc-800` (subtle)
+- **Accent:** `emerald-500` (green highlights)
+- **Narrative Font:** Playfair Display (serif)
+- **UI Font:** Geist Sans
+- **Mono Font:** Geist Mono
+
+---
+
 ## Contact & Maintenance
 
 **Owner:** Newsletter Control Center Team  
-**Last Major Update:** November 23, 2025 (Complete schema rewrite + auth fixes)  
+**Last Major Update:** November 25, 2025 (Glass Cockpit UI implementation)  
 **Status:** ✅ Operational in local development
 
 For questions or issues, see `docs/DEV_RUNBOOK.md` for troubleshooting.

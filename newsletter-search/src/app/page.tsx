@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertCircle } from 'lucide-react';
+import { SearchInput } from '@/components/search-input';
+import { ProcessTheater } from '@/components/process-theater';
+import { NarrativePanel } from '@/components/narrative-panel';
+import { EvidenceCard } from '@/components/evidence-card';
 
 // --- Types ---
 interface Citation {
@@ -22,17 +27,18 @@ interface SemanticResult {
   cost_usd: number;
 }
 
+type AppState = 'idle' | 'loading' | 'results' | 'error';
+
 export default function Page() {
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [appState, setAppState] = useState<AppState>('idle');
   const [results, setResults] = useState<SemanticResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null);
+  
+  const evidenceRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
-    setLoading(true);
+  const handleSearch = async (query: string) => {
+    setAppState('loading');
     setError(null);
     setResults(null);
 
@@ -49,7 +55,6 @@ export default function Page() {
         url: '/api/intelligence/query',
         query,
         apiKeyPresent: !!apiKey,
-        apiKeyFirstChars: apiKey ? `${apiKey.substring(0, 10)}...` : 'none'
       });
 
       const res = await fetch('/api/intelligence/query', {
@@ -69,128 +74,163 @@ export default function Page() {
 
       console.log('✅ Search successful:', data);
       setResults(data);
-    } catch (err: any) {
+      setAppState('results');
+    } catch (err: unknown) {
       console.error('💥 Fetch/Handling Error:', err);
-      setError(err.message || 'An error occurred');
-    } finally {
-      setLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
+      setAppState('error');
     }
   };
 
-  // Helper to format date safely
-  const formatDate = (d: any) => {
-    try {
-      const dateStr = typeof d === 'object' && d?.value ? d.value : d;
-      if (!dateStr) return 'Date unknown';
-      return new Date(dateStr).toLocaleDateString(undefined, { 
-        year: 'numeric', month: 'short', day: 'numeric' 
-      });
-    } catch {
-      return 'Date unknown';
+  const handleCitationHover = useCallback((index: number | null) => {
+    setHighlightedCitation(index);
+  }, []);
+
+  const handleCitationClick = useCallback((index: number) => {
+    const ref = evidenceRefs.current[index];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedCitation(index);
+      // Clear highlight after a moment
+      setTimeout(() => setHighlightedCitation(null), 2000);
     }
-  };
+  }, []);
+
+  const isSearching = appState === 'loading';
+  const hasResults = appState === 'results' && results !== null;
 
   return (
-    <div className="min-h-screen p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <header className="mb-12 text-center">
-        <h1 className="text-3xl font-bold text-blue-900 mb-2">
-          Newsletter Intelligence
-        </h1>
-        <p className="text-gray-600">
-          Search 70k+ newsletters for strategic insights
-        </p>
-      </header>
+    <div className="min-h-screen bg-zinc-950 flex flex-col">
+      {/* Zone A: Command Deck */}
+      <motion.header
+        layout
+        className={`
+          sticky top-0 z-50 w-full
+          bg-zinc-950/90 backdrop-blur-xl
+          border-b border-zinc-800/50
+          transition-shadow duration-300
+          ${hasResults ? 'shadow-lg shadow-black/20' : ''}
+        `}
+      >
+        <SearchInput
+          onSearch={handleSearch}
+          isSearching={isSearching}
+          hasResults={hasResults}
+          costUsd={results?.cost_usd}
+        />
+      </motion.header>
 
-      {/* Search Box */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
-        <form onSubmit={handleSearch} className="flex gap-3">
-          <input
-            type="text"
-            className="flex-1 border border-gray-300 rounded px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ask a question (e.g., 'What is the outlook for lithium mining?')"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            className="bg-blue-600 text-white px-8 py-3 rounded font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Searching...' : 'Search'}
-          </button>
-        </form>
-      </div>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col">
+        <AnimatePresence mode="wait">
+          {/* Idle State - Empty */}
+          {appState === 'idle' && (
+            <motion.div
+              key="idle"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex items-center justify-center"
+            >
+              <div className="text-center text-zinc-600 max-w-md px-4">
+                <p className="text-sm font-mono">
+                  Enter a query to search your intelligence corpus
+                </p>
+              </div>
+            </motion.div>
+          )}
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded mb-8">
-          <strong>Error:</strong> {error}
-          <p className="text-sm mt-2 text-red-600">Check console for full details.</p>
-        </div>
-      )}
+          {/* Loading State - Process Theater */}
+          {appState === 'loading' && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex items-center justify-center px-4"
+            >
+              <ProcessTheater isActive={true} />
+            </motion.div>
+          )}
 
-      {/* Loading Skeleton */}
-      {loading && (
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-        </div>
-      )}
-
-      {/* Results Display */}
-      {results && (
-        <div className="space-y-8 animate-in fade-in duration-500">
-          
-          {/* Answer Section */}
-          <section className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 border-b pb-2">
-              Intelligence Summary
-            </h2>
-            <div className="prose max-w-none text-gray-800 leading-relaxed whitespace-pre-wrap">
-              {results.answer}
-            </div>
-            <div className="mt-6 pt-4 border-t border-gray-100 text-xs text-gray-500 flex justify-between">
-              <span>Based on {results.chunks_used} sources</span>
-              <span>Est. Cost: ${results.cost_usd.toFixed(4)}</span>
-            </div>
-          </section>
-
-          {/* Citations Section */}
-          <section>
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">
-              Sources Used
-            </h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              {results.citations.map((cit, idx) => (
-                <Link
-                  key={`${cit.gmail_message_id}-${idx}`}
-                  href={`/email/${cit.gmail_message_id}?highlight_chunk=${cit.chunk_index ?? 0}`}
-                  className="block bg-white p-4 rounded border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-1 rounded">
-                      {cit.publisher}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {formatDate(cit.date)}
-                    </span>
+          {/* Error State */}
+          {appState === 'error' && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex items-center justify-center px-4"
+            >
+              <div className="max-w-md w-full bg-red-950/30 border border-red-900/50 rounded-lg p-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-red-400 mb-1">Query Failed</h3>
+                    <p className="text-sm text-red-300/70">{error}</p>
+                    <p className="text-xs text-red-400/50 mt-2">
+                      Check console for full details.
+                    </p>
                   </div>
-                  <h4 className="font-medium text-gray-900 group-hover:text-blue-700 line-clamp-2">
-                    {cit.subject}
-                  </h4>
-                  <div className="mt-3 text-xs text-gray-400 flex items-center">
-                    Read full issue →
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-        </div>
-      )}
+          {/* Results State - Split View */}
+          {hasResults && results && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col lg:flex-row min-h-0"
+            >
+              {/* Zone B: Synthesis Plane (Left 60%) */}
+              <div className="lg:w-[60%] border-r border-zinc-800/50 overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+                  <NarrativePanel
+                    content={results.answer}
+                    chunksUsed={results.chunks_used}
+                    onCitationHover={handleCitationHover}
+                    onCitationClick={handleCitationClick}
+                  />
+                </div>
+              </div>
+
+              {/* Zone C: Evidence Rail (Right 40%) */}
+              <div className="lg:w-[40%] bg-zinc-900/30 overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-zinc-800/50">
+                  <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+                    Source Evidence
+                  </h3>
+                  <p className="text-xs text-zinc-600 mt-1">
+                    {results.citations.length} citations from your corpus
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {results.citations.map((citation, index) => (
+                    <EvidenceCard
+                      key={`${citation.gmail_message_id}-${index}`}
+                      ref={(el) => { evidenceRefs.current[index] = el; }}
+                      citation={citation}
+                      index={index}
+                      isHighlighted={highlightedCitation === index}
+                      onHover={handleCitationHover}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* Future: Timeline Scrubber placeholder */}
+      {/* <footer className="h-16 border-t border-zinc-800/50 bg-zinc-900/50">
+        Timeline Scrubber (Phase 2)
+      </footer> */}
     </div>
   );
 }

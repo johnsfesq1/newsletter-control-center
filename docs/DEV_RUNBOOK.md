@@ -195,6 +195,36 @@ npm run dev
 
 ---
 
+### ❌ Error: `The file at .../newsletter-local-dev-key.json does not exist`
+
+**Symptoms:**
+- Query fails with 500 error
+- Server logs: `Error: The file at /Users/.../.gcloud/newsletter-local-dev-key.json does not exist`
+
+**Root Cause:** Conflict between `GOOGLE_APPLICATION_CREDENTIALS` in `.env.local` (or shell environment) and the system Application Default Credentials (ADC).
+
+**Solution:**
+1. Remove `GOOGLE_APPLICATION_CREDENTIALS` from `.env.local`:
+   ```bash
+   # .env.local should only contain:
+   NEXT_PUBLIC_API_KEY=placeholder-token
+   ```
+
+2. Ensure you've authenticated with ADC:
+   ```bash
+   gcloud auth application-default login --project newsletter-control-center
+   ```
+
+3. Restart the server:
+   ```bash
+   kill -9 $(lsof -t -i:3000)
+   cd newsletter-search && npm run dev
+   ```
+
+**Note:** The app will automatically use ADC credentials from `~/.config/gcloud/application_default_credentials.json`.
+
+---
+
 ### ❌ Error: `Syntax error: Unexpected ')'`
 
 **Symptoms:**
@@ -318,12 +348,17 @@ generationConfig: {
 
 ### Via UI (Recommended)
 1. Open http://localhost:3000
-2. Enter query: `"What is the outlook for Taiwan semiconductors?"`
-3. Wait 6-8 seconds
-4. Verify:
-   - Answer appears with citations
-   - Citation cards show publisher (email), subject, date
-   - Cost displayed (e.g., "$0.0234")
+2. You should see the dark "Intelligence Console" with centered search input
+3. Enter query: `"What is the outlook for Taiwan semiconductors?"`
+4. Watch the **Process Theater** animation sequence:
+   - Stage 1: "Scanning Vector Space..." (radar sweep)
+   - Stage 2: "Triangulating Sources..." (chunk counter)
+   - Stage 3: "Extracting Facts..." (analyzing pulse)
+   - Stage 4: "Synthesizing Narrative..." (fade to results)
+5. Verify the results view:
+   - **Left panel (60%):** Narrative in serif font with inline citations
+   - **Right panel (40%):** Evidence cards with publisher, date, snippet
+   - **Header:** Status badge showing cost (e.g., "$0.0234 • Gemini 2.5 Pro")
 
 ### Via curl (For Automation)
 
@@ -494,5 +529,5 @@ A: Restart the server. Budget is stored in-memory and resets on restart.
 
 ---
 
-**Last Updated:** November 23, 2025  
-**Status:** ✅ Complete and tested
+**Last Updated:** November 25, 2025  
+**Status:** ✅ Complete and tested (Glass Cockpit UI)
