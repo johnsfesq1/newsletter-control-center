@@ -529,5 +529,101 @@ A: Restart the server. Budget is stored in-memory and resets on restart.
 
 ---
 
+## The Briefing Engine
+
+### Overview
+
+The Briefing Engine generates daily intelligence briefings by processing newsletters through a Map-Reduce LLM pipeline.
+
+### Triggering a Briefing
+
+**Manual Generation (72-hour window):**
+```bash
+curl -X POST http://localhost:3000/api/intelligence/briefing/generate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev-secret-123" \
+  -d '{"windowHours": 72}'
+```
+
+**Default (Delta since last briefing):**
+```bash
+curl -X POST http://localhost:3000/api/intelligence/briefing/generate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dev-secret-123"
+```
+
+### Admin Key Location
+
+The admin key is stored in `.env.local`:
+```
+BRIEFING_ADMIN_KEY=dev-secret-123
+```
+
+### API Endpoints
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/intelligence/briefing/generate` | POST | Bearer token | Trigger generation |
+| `/api/intelligence/briefing/latest` | GET | None | Get most recent briefing |
+| `/api/intelligence/briefing/archive` | GET | None | List all briefings |
+| `/api/intelligence/briefing/[id]` | GET | None | Get specific briefing |
+
+### Viewing the Dashboard
+
+```bash
+open http://localhost:3000/briefing
+```
+
+### Troubleshooting
+
+#### Empty Briefing (0 emails processed)
+
+**Cause:** No emails in the time window.
+
+**Solutions:**
+1. Increase the `windowHours` parameter:
+   ```bash
+   curl -X POST ... -d '{"windowHours": 168}'  # 7 days
+   ```
+
+2. Check if emails exist in the window:
+   ```bash
+   bq query --use_legacy_sql=false "
+   SELECT COUNT(*) 
+   FROM \`newsletter-control-center.ncc_production.raw_emails\`
+   WHERE ingested_at > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 72 HOUR)
+   "
+   ```
+
+#### 401 Unauthorized
+
+**Cause:** Missing or wrong admin key.
+
+**Solution:**
+1. Check `.env.local` has `BRIEFING_ADMIN_KEY=dev-secret-123`
+2. Restart dev server to pick up env changes
+3. Ensure curl includes: `-H "Authorization: Bearer dev-secret-123"`
+
+#### 404 Model Not Found
+
+**Cause:** Wrong model name in generator.ts.
+
+**Solution:**
+Check `src/lib/briefing/generator.ts`:
+```typescript
+const FLASH_MODEL = 'gemini-2.0-flash';  // ✅ Correct
+const PRO_MODEL = 'gemini-2.5-pro';       // ✅ Correct
+```
+
+#### JSON Parse Error
+
+**Cause:** Gemini returned truncated or malformed JSON.
+
+**Status:** Auto-repair logic attempts to fix. If it fails, a fallback briefing is returned.
+
+**Debug:** Check server logs for raw response preview.
+
+---
+
 **Last Updated:** November 25, 2025  
-**Status:** ✅ Complete and tested (Glass Cockpit UI)
+**Status:** ✅ Complete and tested (Glass Cockpit UI + Briefing Engine)

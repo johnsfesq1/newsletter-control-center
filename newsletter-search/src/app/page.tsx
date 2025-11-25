@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Newspaper } from 'lucide-react';
+import Link from 'next/link';
 import { SearchInput } from '@/components/search-input';
 import { ProcessTheater } from '@/components/process-theater';
 import { NarrativePanel } from '@/components/narrative-panel';
@@ -113,6 +114,24 @@ export default function Page() {
           ${hasResults ? 'shadow-lg shadow-black/20' : ''}
         `}
       >
+        {/* Navigation bar */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/30">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+              Intelligence Center
+            </span>
+          </div>
+          <Link
+            href="/briefing"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-colors"
+          >
+            <Newspaper className="w-4 h-4 text-emerald-400" />
+            <span className="text-sm font-medium text-emerald-400">
+              Daily Briefing
+            </span>
+          </Link>
+        </div>
+        
         <SearchInput
           onSearch={handleSearch}
           isSearching={isSearching}
